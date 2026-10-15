@@ -1,0 +1,8 @@
+[build]
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/yahoo/*"
+  to = "/.netlify/functions/yahoo-proxy/:splat"
+  status = 200
