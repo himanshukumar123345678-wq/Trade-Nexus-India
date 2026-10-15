@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const calculateMovingAverage = (prices, period) =>
   prices.map((_, index) => {
@@ -75,7 +75,21 @@ export default function TradeNexusIndia() {
     },
   ];
 
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return false;
+
+    try {
+      const userData = JSON.parse(storedUser);
+      return (
+        typeof userData.identifier === 'string' &&
+        typeof userData.method === 'string'
+      );
+    } catch {
+      localStorage.removeItem('user');
+      return false;
+    }
+  });
   const [loginMethod, setLoginMethod] = useState('email');
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -93,6 +107,7 @@ export default function TradeNexusIndia() {
     )
   );
   const [search, setSearch] = useState('');
+  const normalizedSearch = search.trim();
   const [shareSearchResults, setShareSearchResults] = useState([]);
   const [shareSearchStatus, setShareSearchStatus] = useState('idle');
   const [selectedShare, setSelectedShare] = useState(null);
@@ -149,7 +164,7 @@ export default function TradeNexusIndia() {
   }, [stocks]);
 
   useEffect(() => {
-    const query = search.trim();
+    const query = normalizedSearch;
     if (query.length < 2) {
       setShareSearchResults([]);
       setShareSearchStatus('idle');
@@ -169,26 +184,34 @@ export default function TradeNexusIndia() {
         }
 
         const data = await response.json();
-        const results = (data.quotes || []).filter(
-          (quote) =>
-            quote.quoteType === 'EQUITY' &&
-            /\.(NS|BO)$/i.test(quote.symbol || '')
-        );
-        setShareSearchResults(results);
-        setShareSearchStatus(results.length ? 'ready' : 'empty');
+        const results = (data.quotes || [])
+          .filter(
+            (quote) =>
+              quote.quoteType === 'EQUITY' &&
+              /\.(NS|BO)$/i.test(quote.symbol || '')
+          )
+          .filter(
+            (quote, index, entries) =>
+              entries.findIndex((entry) => entry.symbol === quote.symbol) === index
+          );
+
+        if (!controller.signal.aborted) {
+          setShareSearchResults(results);
+          setShareSearchStatus(results.length ? 'ready' : 'empty');
+        }
       } catch (error) {
-        if (error.name !== 'AbortError') {
+        if (!controller.signal.aborted && error.name !== 'AbortError') {
           setShareSearchResults([]);
           setShareSearchStatus('error');
         }
       }
-    }, 350);
+    }, 250);
 
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [search]);
+  }, [normalizedSearch]);
 
   useEffect(() => {
     if (!selectedShare) {
@@ -305,11 +328,18 @@ export default function TradeNexusIndia() {
     return () => controller.abort();
   }, [selectedShare]);
 
-  const filteredStocks = stocks.filter(
-    (s) =>
-      s.symbol.toLowerCase().includes(search.toLowerCase()) ||
-      s.company.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredStocks = useMemo(() => {
+    const searchTerm = normalizedSearch.toLowerCase();
+    if (!searchTerm) {
+      return stocks;
+    }
+
+    return stocks.filter(
+      (stock) =>
+        stock.symbol.toLowerCase().includes(searchTerm) ||
+        stock.company.toLowerCase().includes(searchTerm)
+    );
+  }, [normalizedSearch, stocks]);
 
   const unrealizedPnL = Object.entries(holdings).reduce((total, [symbol, h]) => {
     const currentPrice = stocks.find((s) => s.symbol === symbol)?.price ?? marketPrices[symbol];
@@ -443,13 +473,19 @@ export default function TradeNexusIndia() {
 
   const handleLogin = (event) => {
     event.preventDefault();
+    const userData = {
+      method: loginMethod,
+      identifier: loginIdentifier.trim(),
+    };
+    localStorage.setItem('user', JSON.stringify(userData));
     setLoggedIn(true);
   };
 
   const handleStockSearchChange = (value) => {
-    setSearch(value);
+    const nextValue = value.trimStart();
+    setSearch(nextValue);
     setShareSearchResults([]);
-    setShareSearchStatus(value.trim().length >= 2 ? 'loading' : 'idle');
+    setShareSearchStatus(nextValue.length >= 2 ? 'loading' : 'idle');
     setSelectedShare(null);
     setShareChartHoverIndex(null);
   };
@@ -635,7 +671,13 @@ export default function TradeNexusIndia() {
             <p className="header-subtitle">Your market, at a glance</p>
           </div>
 
-          <button className="logout-button" onClick={() => setLoggedIn(false)}>
+          <button
+            className="logout-button"
+            onClick={() => {
+              localStorage.removeItem('user');
+              setLoggedIn(false);
+            }}
+          >
             Logout
           </button>
         </header>
@@ -809,17 +851,17 @@ export default function TradeNexusIndia() {
           <span className="search-hint">NSE / BSE</span>
         </label>
 
-        {search.trim().length > 0 && search.trim().length < 2 && (
+        {normalizedSearch.length > 0 && normalizedSearch.length < 2 && (
           <p className="lookup-message search-status-message">Enter at least 2 characters to search.</p>
         )}
-        {search.trim().length >= 2 && (
+        {normalizedSearch.length >= 2 && (
           <section className="market-search-results" aria-label="NSE and BSE search results">
             <div className="market-search-results-heading">
               <strong>NSE/BSE market matches</strong>
               {shareSearchStatus === 'loading' && <span>Searching…</span>}
             </div>
             {shareSearchStatus === 'empty' && (
-              <p className="lookup-message">No NSE/BSE listings found for “{search}”.</p>
+              <p className="lookup-message">No NSE/BSE listings found for “{normalizedSearch}”.</p>
             )}
             {shareSearchStatus === 'error' && (
               <p className="lookup-message lookup-error">Could not load NSE/BSE results. Please try again.</p>
@@ -1364,8 +1406,8 @@ export default function TradeNexusIndia() {
                 </article>
               );
             })}
-            {filteredStocks.length === 0 && search.trim().length === 1 && (
-              <div className="empty-state">No watchlist shares match “{search}”. Enter at least 2 characters to search the full NSE/BSE market.</div>
+            {filteredStocks.length === 0 && normalizedSearch.length === 1 && (
+              <div className="empty-state">No watchlist shares match “{normalizedSearch}”. Enter at least 2 characters to search the full NSE/BSE market.</div>
             )}
           </section>
 
