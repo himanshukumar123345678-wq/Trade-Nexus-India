@@ -6,3 +6,13 @@
   from = "/api/yahoo/*"
   to = "/.netlify/functions/yahoo-proxy/:splat"
   status = 200
+
+[[redirects]]
+  from = "/api/trade"
+  to = "/.netlify/functions/trades"
+  status = 200
+
+[[redirects]]
+  from = "/api/trades"
+  to = "/.netlify/functions/trades"
+  status = 200

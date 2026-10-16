@@ -75,21 +75,9 @@ export default function TradeNexusIndia() {
     },
   ];
 
-  const [loggedIn, setLoggedIn] = useState(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) return false;
-
-    try {
-      const userData = JSON.parse(storedUser);
-      return (
-        typeof userData.identifier === 'string' &&
-        typeof userData.method === 'string'
-      );
-    } catch {
-      localStorage.removeItem('user');
-      return false;
-    }
-  });
+  const [user, setUser] = useState(() =>
+    localStorage.getItem('tradeNexusUser')
+  );
   const [loginMethod, setLoginMethod] = useState('email');
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -123,8 +111,11 @@ export default function TradeNexusIndia() {
   const [cash, setCash] = useState(30000);
   const [holdings, setHoldings] = useState({});
   const [orders, setOrders] = useState([]);
+  const [ordersError, setOrdersError] = useState(null);
   const [quantities, setQuantities] = useState({});
   const [modal, setModal] = useState(null);
+  const [tradeError, setTradeError] = useState(null);
+  const [tradeSubmitting, setTradeSubmitting] = useState(false);
   const [success, setSuccess] = useState(null);
   const [pnlHistory, setPnlHistory] = useState(() =>
     Array.from({ length: 12 }, (_, index) => ({
@@ -136,6 +127,54 @@ export default function TradeNexusIndia() {
   const [hoveredPnlIndex, setHoveredPnlIndex] = useState(null);
   const [showRealized, setShowRealized] = useState(true);
   const [showUnrealized, setShowUnrealized] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setOrders([]);
+      setOrdersError(null);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const loadOrders = async () => {
+      setOrdersError(null);
+      try {
+        const response = await fetch(
+          `/api/trades?userId=${encodeURIComponent(user)}`,
+          { signal: controller.signal }
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Could not load your trades.');
+        }
+
+        const loadedOrders = result.map((trade) => ({
+          id: trade.id,
+          side: trade.transaction_type,
+          symbol: trade.stock_name,
+          qty: trade.quantity,
+          price: Number(trade.price),
+          total: Number(trade.price) * trade.quantity,
+          pnl: 0,
+          time: new Date(trade.trade_date).toLocaleString(),
+        }));
+        setOrders((currentOrders) => {
+          const loadedIds = new Set(loadedOrders.map((order) => String(order.id)));
+          const recentOrders = currentOrders.filter(
+            (order) => !loadedIds.has(String(order.id))
+          );
+          return [...recentOrders, ...loadedOrders];
+        });
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setOrdersError(error.message || 'Could not load your trades.');
+        }
+      }
+    };
+
+    loadOrders();
+    return () => controller.abort();
+  }, [user]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -473,12 +512,9 @@ export default function TradeNexusIndia() {
 
   const handleLogin = (event) => {
     event.preventDefault();
-    const userData = {
-      method: loginMethod,
-      identifier: loginIdentifier.trim(),
-    };
-    localStorage.setItem('user', JSON.stringify(userData));
-    setLoggedIn(true);
+    const signedInUser = loginIdentifier.trim();
+    localStorage.setItem('tradeNexusUser', signedInUser);
+    setUser(signedInUser);
   };
 
   const handleStockSearchChange = (value) => {
@@ -490,98 +526,115 @@ export default function TradeNexusIndia() {
     setShareChartHoverIndex(null);
   };
 
-  const confirmOrder = () => {
+  const confirmOrder = async () => {
+    if (!modal || tradeSubmitting) return;
     const { side, stock, qty } = modal;
     const total = stock.price * qty;
     let tradePnl = 0;
 
     if (side === 'BUY') {
       if (cash < total) {
-        alert('Insufficient balance');
+        setTradeError('Insufficient balance.');
         return;
       }
-
-      setCash((v) => v - total);
-
-      setHoldings((prev) => {
-        const existing = prev[stock.symbol];
-
-        if (!existing) {
-          return {
-            ...prev,
-            [stock.symbol]: {
-              qty,
-              avgPrice: stock.price,
-            },
-          };
-        }
-
-        const newQty = existing.qty + qty;
-        const avg = (existing.qty * existing.avgPrice + qty * stock.price) / newQty;
-
-        return {
-          ...prev,
-          [stock.symbol]: {
-            qty: newQty,
-            avgPrice: avg,
-          },
-        };
-      });
     }
 
     if (side === 'SELL') {
       const holding = holdings[stock.symbol];
 
       if (!holding || holding.qty < qty) {
-        alert('Not enough shares available');
+        setTradeError('Not enough shares available.');
         return;
       }
 
       const pnl = (stock.price - holding.avgPrice) * qty;
       tradePnl = pnl;
-
-      setCash((v) => v + total);
-
-      setHoldings((previous) => {
-        const remainingQuantity = holding.qty - qty;
-        if (remainingQuantity === 0) {
-          const updatedHoldings = { ...previous };
-          delete updatedHoldings[stock.symbol];
-          return updatedHoldings;
-        }
-
-        return {
-          ...previous,
-          [stock.symbol]: {
-            qty: remainingQuantity,
-            avgPrice: holding.avgPrice,
-          },
-        };
-      });
     }
 
-    setMarketPrices((previous) => ({
-      ...previous,
-      [stock.symbol]: stock.price,
-    }));
+    setTradeSubmitting(true);
+    setTradeError(null);
+    try {
+      const response = await fetch('/api/trade', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: user,
+          stockName: stock.company || stock.symbol,
+          type: side,
+          quantity: qty,
+          price: stock.price,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not save this trade.');
+      }
 
-    const order = {
-      id: Date.now(),
-      side,
-      symbol: stock.symbol,
-      qty,
-      price: stock.price,
-      pnl: tradePnl,
-      total,
-      time: new Date().toLocaleString(),
-    };
+      if (side === 'BUY') {
+        setCash((value) => value - total);
+        setHoldings((previous) => {
+          const existing = previous[stock.symbol];
+          if (!existing) {
+            return {
+              ...previous,
+              [stock.symbol]: { qty, avgPrice: stock.price },
+            };
+          }
 
-    setOrders((p) => [order, ...p]);
-    setSuccess(order);
-    setModal(null);
+          const newQty = existing.qty + qty;
+          const avgPrice =
+            (existing.qty * existing.avgPrice + qty * stock.price) / newQty;
+          return {
+            ...previous,
+            [stock.symbol]: { qty: newQty, avgPrice },
+          };
+        });
+      } else {
+        setCash((value) => value + total);
+        setHoldings((previous) => {
+          const remainingQuantity = previous[stock.symbol].qty - qty;
+          if (remainingQuantity === 0) {
+            const updatedHoldings = { ...previous };
+            delete updatedHoldings[stock.symbol];
+            return updatedHoldings;
+          }
+          return {
+            ...previous,
+            [stock.symbol]: {
+              ...previous[stock.symbol],
+              qty: remainingQuantity,
+            },
+          };
+        });
+      }
+
+      setMarketPrices((previous) => ({
+        ...previous,
+        [stock.symbol]: stock.price,
+      }));
+
+      const order = {
+        id: result.id,
+        side: result.transaction_type,
+        symbol: result.stock_name,
+        qty: result.quantity,
+        price: Number(result.price),
+        pnl: tradePnl,
+        total: Number(result.price) * result.quantity,
+        time: new Date(result.trade_date).toLocaleString(),
+      };
+
+      setOrders((previous) => [order, ...previous]);
+      setSuccess(order);
+      setModal(null);
+    } catch (error) {
+      setTradeError(error.message || 'Could not save this trade.');
+    } finally {
+      setTradeSubmitting(false);
+    }
   };
 
-  if (!loggedIn) {
+  if (!user) {
     return (
       <div className="app-container login-container">
         <section className="login-card">
@@ -674,8 +727,8 @@ export default function TradeNexusIndia() {
           <button
             className="logout-button"
             onClick={() => {
-              localStorage.removeItem('user');
-              setLoggedIn(false);
+              localStorage.removeItem('tradeNexusUser');
+              setUser(null);
             }}
           >
             Logout
@@ -1267,7 +1320,10 @@ export default function TradeNexusIndia() {
                         type="button"
                         className="trade-button buy-button"
                         disabled={!Number.isFinite(quotePrice) || quotePrice <= 0}
-                        onClick={() => setModal({ side: 'BUY', stock, qty })}
+                        onClick={() => {
+                          setTradeError(null);
+                          setModal({ side: 'BUY', stock, qty });
+                        }}
                       >
                         ↗ Buy
                       </button>
@@ -1275,7 +1331,10 @@ export default function TradeNexusIndia() {
                         type="button"
                         className="trade-button sell-button"
                         disabled={!Number.isFinite(quotePrice) || quotePrice <= 0 || holdingQuantity < qty}
-                        onClick={() => setModal({ side: 'SELL', stock, qty })}
+                        onClick={() => {
+                          setTradeError(null);
+                          setModal({ side: 'SELL', stock, qty });
+                        }}
                       >
                         ↘ Sell
                       </button>
@@ -1389,7 +1448,10 @@ export default function TradeNexusIndia() {
                   <div className="trade-actions">
                     <button
                       className="trade-button buy-button"
-                      onClick={() => setModal({ side: 'BUY', stock, qty })}
+                      onClick={() => {
+                        setTradeError(null);
+                        setModal({ side: 'BUY', stock, qty });
+                      }}
                     >
                       <span aria-hidden="true">↗</span>
                       Buy
@@ -1397,7 +1459,10 @@ export default function TradeNexusIndia() {
 
                     <button
                       className="trade-button sell-button"
-                      onClick={() => setModal({ side: 'SELL', stock, qty })}
+                      onClick={() => {
+                        setTradeError(null);
+                        setModal({ side: 'SELL', stock, qty });
+                      }}
                     >
                       <span aria-hidden="true">↘</span>
                       Sell
@@ -1439,6 +1504,7 @@ export default function TradeNexusIndia() {
                 <span className="panel-icon orders-icon" aria-hidden="true">↗</span>
               </div>
 
+              {ordersError && <p className="order-error" role="alert">{ordersError}</p>}
               {orders.map((o) => (
                 <div key={o.id} className="order-row">
                   <span className={`order-side ${o.side === 'BUY' ? 'order-buy' : 'order-sell'}`}>{o.side}</span>
@@ -1464,13 +1530,15 @@ export default function TradeNexusIndia() {
                 <div className="summary-total"><span>Estimated total</span><strong>₹{(modal.stock.price * modal.qty).toFixed(2)}</strong></div>
               </div>
 
+              {tradeError && <p className="order-error" role="alert">{tradeError}</p>}
+
               <div className="dialog-actions">
-                <button className="dialog-button cancel-order-button" onClick={() => setModal(null)}>
+                <button className="dialog-button cancel-order-button" onClick={() => setModal(null)} disabled={tradeSubmitting}>
                   Cancel
                 </button>
 
-                <button className="dialog-button confirm-order-button" onClick={confirmOrder}>
-                  Confirm {modal.side === 'BUY' ? 'Buy' : 'Sell'}
+                <button className="dialog-button confirm-order-button" onClick={confirmOrder} disabled={tradeSubmitting}>
+                  {tradeSubmitting ? 'Saving…' : `Confirm ${modal.side === 'BUY' ? 'Buy' : 'Sell'}`}
                 </button>
               </div>
             </div>

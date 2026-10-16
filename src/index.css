@@ -1678,6 +1678,12 @@ button {
   margin: 16px 0 2px;
 }
 
+.order-error {
+  margin: 12px 0 0;
+  color: #fda4af;
+  font-size: 0.85rem;
+}
+
 .empty-state {
   padding: 25px 18px;
   border: 1px dashed rgba(132, 163, 196, 0.26);
