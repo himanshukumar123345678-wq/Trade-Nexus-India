@@ -1,6 +1,80 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 
+const INITIAL_CASH = 30000;
+
+const getLocalTradesKey = (user) => `tradeNexusTrades:${user}`;
+
+const readLocalTrades = (user) => {
+  const storedTrades = localStorage.getItem(getLocalTradesKey(user));
+  if (!storedTrades) return [];
+
+  const trades = JSON.parse(storedTrades);
+  if (!Array.isArray(trades)) {
+    throw new Error('Saved trade data is invalid. Clear this browser’s trade data to continue.');
+  }
+  return trades;
+};
+
+const isTradeStorageUnconfigured = (response, result) =>
+  response.status === 503 && result.error === 'Trade storage is not configured.';
+
+const restorePortfolio = (trades) => {
+  let cash = INITIAL_CASH;
+  const holdings = {};
+  const chronologicalTrades = [...trades].sort(
+    (first, second) =>
+      new Date(first.trade_date).getTime() -
+      new Date(second.trade_date).getTime()
+  );
+
+  const orders = chronologicalTrades.map((trade) => {
+    const quantity = Number(trade.quantity);
+    const price = Number(trade.price);
+    const total = quantity * price;
+    const side = trade.transaction_type;
+    const symbol = trade.stock_name;
+    let pnl = 0;
+
+    if (side === 'BUY') {
+      cash -= total;
+      const existing = holdings[symbol];
+      const newQuantity = (existing?.qty || 0) + quantity;
+      holdings[symbol] = {
+        qty: newQuantity,
+        avgPrice: existing
+          ? (existing.qty * existing.avgPrice + total) / newQuantity
+          : price,
+      };
+    } else {
+      const holding = holdings[symbol];
+      if (holding && holding.qty >= quantity) {
+        pnl = (price - holding.avgPrice) * quantity;
+        cash += total;
+        const remainingQuantity = holding.qty - quantity;
+        if (remainingQuantity === 0) {
+          delete holdings[symbol];
+        } else {
+          holdings[symbol] = { ...holding, qty: remainingQuantity };
+        }
+      }
+    }
+
+    return {
+      id: trade.id,
+      side,
+      symbol,
+      qty: quantity,
+      price,
+      pnl,
+      total,
+      time: new Date(trade.trade_date).toLocaleString(),
+    };
+  });
+
+  return { cash, holdings, orders: orders.reverse() };
+};
+
 const calculateMovingAverage = (prices, period) =>
   prices.map((_, index) => {
     if (index < period - 1) return null;
@@ -108,10 +182,11 @@ export default function TradeNexusIndia() {
   const [shareChartHoverIndex, setShareChartHoverIndex] = useState(null);
   const [showMovingAverage, setShowMovingAverage] = useState(false);
   const [showRsi, setShowRsi] = useState(false);
-  const [cash, setCash] = useState(30000);
+  const [cash, setCash] = useState(INITIAL_CASH);
   const [holdings, setHoldings] = useState({});
   const [orders, setOrders] = useState([]);
   const [ordersError, setOrdersError] = useState(null);
+  const [localTradeStorage, setLocalTradeStorage] = useState(false);
   const [quantities, setQuantities] = useState({});
   const [modal, setModal] = useState(null);
   const [tradeError, setTradeError] = useState(null);
@@ -143,21 +218,20 @@ export default function TradeNexusIndia() {
           `/api/trades?userId=${encodeURIComponent(user)}`,
           { signal: controller.signal }
         );
-        const result = await response.json();
-        if (!response.ok) {
+        let result = await response.json();
+        if (isTradeStorageUnconfigured(response, result)) {
+          result = readLocalTrades(user);
+          setLocalTradeStorage(true);
+        } else if (!response.ok) {
           throw new Error(result.error || 'Could not load your trades.');
+        } else {
+          setLocalTradeStorage(false);
         }
 
-        const loadedOrders = result.map((trade) => ({
-          id: trade.id,
-          side: trade.transaction_type,
-          symbol: trade.stock_name,
-          qty: trade.quantity,
-          price: Number(trade.price),
-          total: Number(trade.price) * trade.quantity,
-          pnl: 0,
-          time: new Date(trade.trade_date).toLocaleString(),
-        }));
+        const portfolio = restorePortfolio(result);
+        const loadedOrders = portfolio.orders;
+        setCash(portfolio.cash);
+        setHoldings(portfolio.holdings);
         setOrders((currentOrders) => {
           const loadedIds = new Set(loadedOrders.map((order) => String(order.id)));
           const recentOrders = currentOrders.filter(
@@ -559,15 +633,33 @@ export default function TradeNexusIndia() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           userId: user,
-          stockName: stock.company || stock.symbol,
+          stockName: stock.symbol,
           type: side,
           quantity: qty,
           price: stock.price,
         }),
       });
-      const result = await response.json();
-      if (!response.ok) {
+      let result = await response.json();
+      if (isTradeStorageUnconfigured(response, result)) {
+        const localTrades = readLocalTrades(user);
+        result = {
+          id: `local-${Date.now()}`,
+          user_id: user,
+          stock_name: stock.symbol,
+          transaction_type: side,
+          quantity: qty,
+          price: stock.price,
+          trade_date: new Date().toISOString(),
+        };
+        localStorage.setItem(
+          getLocalTradesKey(user),
+          JSON.stringify([result, ...localTrades])
+        );
+        setLocalTradeStorage(true);
+      } else if (!response.ok) {
         throw new Error(result.error || 'Could not save this trade.');
+      } else {
+        setLocalTradeStorage(false);
       }
 
       if (side === 'BUY') {
@@ -1505,6 +1597,11 @@ export default function TradeNexusIndia() {
               </div>
 
               {ordersError && <p className="order-error" role="alert">{ordersError}</p>}
+              {localTradeStorage && (
+                <p className="empty-panel" role="status">
+                  Server trade storage is not configured. Trades are saved in this browser only and will not sync across devices.
+                </p>
+              )}
               {orders.map((o) => (
                 <div key={o.id} className="order-row">
                   <span className={`order-side ${o.side === 'BUY' ? 'order-buy' : 'order-sell'}`}>{o.side}</span>

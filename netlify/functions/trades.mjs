@@ -2,6 +2,8 @@ import mysql from 'mysql2/promise';
 
 let pool;
 
+class MissingDatabaseConfigurationError extends Error {}
+
 function jsonResponse(statusCode, body) {
   return new Response(JSON.stringify(body), {
     status: statusCode,
@@ -9,16 +11,40 @@ function jsonResponse(statusCode, body) {
   });
 }
 
+function handleDatabaseInitializationError(error) {
+  if (error instanceof MissingDatabaseConfigurationError) {
+    console.error(error.message);
+    return jsonResponse(503, { error: 'Trade storage is not configured.' });
+  }
+
+  console.error('Failed to initialize trade storage:', error);
+  return jsonResponse(500, { error: 'Could not initialize trade storage.' });
+}
+
 function getDatabasePool() {
-  const { MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE } = process.env;
+  const MYSQL_HOST = process.env.MYSQL_HOST || process.env.mysql_host;
+  const MYSQL_USER = process.env.MYSQL_USER || process.env.mysql_user;
+  const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || process.env.mysql_password;
+  const MYSQL_DATABASE = process.env.MYSQL_DATABASE || process.env.mysql_database;
+  const MYSQL_PORT = process.env.MYSQL_PORT || process.env.mysql_port;
   if (!MYSQL_HOST || !MYSQL_USER || !MYSQL_PASSWORD || !MYSQL_DATABASE) {
-    throw new Error('MySQL connection environment variables are not configured.');
+    const missingVariables = [
+      ['MYSQL_HOST', MYSQL_HOST],
+      ['MYSQL_USER', MYSQL_USER],
+      ['MYSQL_PASSWORD', MYSQL_PASSWORD],
+      ['MYSQL_DATABASE', MYSQL_DATABASE],
+    ]
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+    throw new MissingDatabaseConfigurationError(
+      `MySQL connection environment variables are not configured: ${missingVariables.join(', ')}.`
+    );
   }
 
   if (!pool) {
     pool = mysql.createPool({
       host: MYSQL_HOST,
-      port: Number(process.env.MYSQL_PORT || 3306),
+      port: Number(MYSQL_PORT || 3306),
       user: MYSQL_USER,
       password: MYSQL_PASSWORD,
       database: MYSQL_DATABASE,
@@ -46,8 +72,7 @@ export default async (request) => {
     try {
       db = getDatabasePool();
     } catch (error) {
-      console.error(error.message);
-      return jsonResponse(503, { error: 'Trade storage is not configured.' });
+      return handleDatabaseInitializationError(error);
     }
 
     try {
@@ -99,8 +124,7 @@ export default async (request) => {
   try {
     db = getDatabasePool();
   } catch (error) {
-    console.error(error.message);
-    return jsonResponse(503, { error: 'Trade storage is not configured.' });
+    return handleDatabaseInitializationError(error);
   }
 
   try {
