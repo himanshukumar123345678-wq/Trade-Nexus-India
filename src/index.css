@@ -2749,8 +2749,13 @@ body,
 
 iframe[src*="netlify"],
 [data-netlify-deploy-id],
+[data-netlify-badge],
 #netlify-badge,
-.netlify-drawer-button {
+.netlify-badge,
+.netlify-drawer-button,
+div[class*="netlify"] {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
