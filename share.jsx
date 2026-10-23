@@ -196,16 +196,54 @@ export default function TradeNexusIndia() {
 
   if (!loggedIn) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <button
-          onClick={() =>
-            setLoggedIn(true)
-          }
-          className="bg-blue-600 text-white px-8 py-3 rounded-xl"
-        >
-          Login Demo
-        </button>
-      </div>
+      <main className="relative min-h-screen overflow-hidden flex items-center justify-center bg-slate-950 px-4 py-12 text-white">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-blue-900/50 via-slate-950 to-slate-950"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-blue-600/25 blur-3xl"
+        />
+
+        <section className="relative w-full max-w-md rounded-3xl border border-white/15 bg-white/[0.08] p-8 shadow-2xl shadow-blue-950/40 backdrop-blur-xl sm:p-10">
+          <div className="mb-8">
+            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-200/20 bg-cyan-300/10 text-xl font-bold text-cyan-200">
+              T
+            </div>
+            <p className="mb-2 text-sm font-medium tracking-[0.2em] text-cyan-200/80">
+              TRADENEXUS INDIA
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Welcome back
+            </h1>
+            <p className="mt-3 leading-relaxed text-slate-300">
+              Sign in to pick up where you left off and keep your portfolio in view.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4">
+            <p className="text-sm text-slate-300">
+              Ready to explore the markets?
+            </p>
+            <button
+              onClick={() =>
+                setLoggedIn(true)
+              }
+              className="mt-4 w-full rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 px-8 py-3.5 font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.35)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_34px_rgba(34,211,238,0.5)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300"
+            >
+              Sign in
+            </button>
+            <p className="mt-4 text-center text-xs text-slate-400">
+              Demo access · No account required
+            </p>
+          </div>
+        </section>
+      </main>
     );
   }
 

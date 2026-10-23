@@ -729,9 +729,64 @@ export default function TradeNexusIndia() {
   if (!user) {
     return (
       <div className="app-container login-container">
+        <svg className="login-market-art" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <linearGradient id="market-line-gold" x1="0" x2="1">
+              <stop offset="0" stopColor="#b8873b" stopOpacity="0.08" />
+              <stop offset="0.5" stopColor="#f3c66b" stopOpacity="0.72" />
+              <stop offset="1" stopColor="#b8873b" stopOpacity="0.08" />
+            </linearGradient>
+            <filter id="market-glow-color" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="market-glow">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <g className="login-map-lines" fill="none" stroke="#d5ad61" strokeWidth="1.35">
+            <path d="m205 244 36-28 58 8 27 27 48 4 18 25-18 25-41 4-13 29-29 4-15 39-31 6-12-31-30-10-19-44-29-21 11-35-19-22z" />
+            <path d="m338 425 27 12 18 32-8 44-19 36-8 52-22 25-17-38 3-49-20-42 6-40 20-32z" />
+            <path d="m585 238 43-22 45 13 26-10 38 16 24-8 38 25 40 2 34 25-10 25-45 2-16 25-47-5-20 24-40-4-32 25-26-12-30 22-28-14 5-32-23-23 10-28-25-21 13-25-21-25z" />
+            <path d="m701 387 40-13 42 13 27 34-5 37-27 25-10 42-32 35-17 51-30 34-20-26 4-45-21-39 6-39-17-42 21-34z" />
+            <path d="m940 252 47-27 73 7 31 22 51-2 40 26-7 27-38 12-27 32-46-9-31 21-35-12-30 14-32-25 5-34-21-23z" />
+            <path d="m1117 470 36-17 40 15 25 34-15 37-32 20-27-17-33 9-20-34 11-29z" />
+            <path d="M120 575h1200M160 620h1120M210 665h1020" opacity=".28" />
+          </g>
+          <g className="login-candles" filter="url(#market-glow)" stroke="url(#market-line-gold)">
+            <path d="M80 710 165 670 220 688 285 616 350 640 420 558 480 580 555 520 630 544 700 462 760 490 830 410 890 438 960 350 1030 380 1090 296 1165 328 1230 238 1300 270 1370 180" fill="none" strokeWidth="3" />
+          </g>
+          <g className="login-candle-bars" filter="url(#market-glow-color)" strokeWidth="2">
+            <g className="candle-amber" stroke="#f3bd59" fill="#c78b30" fillOpacity=".52">
+              <path d="M185 640v78M173 666h24v31h-24zM365 594v78M353 620h24v32h-24zM545 484v78M533 508h24v30h-24zM725 430v82M713 457h24v32h-24zM905 396v72M893 420h24v27h-24zM1085 264v80M1073 290h24v31h-24zM1265 205v80M1253 231h24v31h-24z" />
+            </g>
+            <g className="candle-green" stroke="#55e6a5" fill="#21b879" fillOpacity=".55">
+              <path d="M275 580v74M263 605h24v28h-24zM635 506v72M623 530h24v27h-24zM815 374v78M803 399h24v30h-24zM1175 290v72M1163 314h24v27h-24z" />
+            </g>
+            <g className="candle-cyan" stroke="#56d8f4" fill="#1ca3c5" fillOpacity=".52">
+              <path d="M455 526v82M443 555h24v31h-24zM995 316v78M983 342h24v30h-24z" />
+            </g>
+          </g>
+        </svg>
         <section className="login-card">
           <header className="login-brand">
-            <span className="login-brand-mark" aria-hidden="true">T</span>
+            <span className="login-brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 64 64">
+                <path className="brand-shield" d="M32 5 51 12v16c0 14-8 24-19 31C21 52 13 42 13 28V12L32 5Z" />
+                <g className="brand-laurel">
+                  <path d="M17 43c-5-10-5-20 1-29M47 43c5-10 5-20-1-29" />
+                  <path d="M15 19c6 0 9 3 9 8-5 0-8-2-9-8ZM14 28c6-1 10 1 11 6-5 1-9-1-11-6ZM18 37c5-2 9-1 12 3-4 3-8 2-12-3ZM49 19c-6 0-9 3-9 8 5 0 8-2 9-8ZM50 28c-6-1-10 1-11 6 5 1 9-1 11-6ZM46 37c-5-2-9-1-12 3 4 3 8 2 12-3Z" />
+                </g>
+                <text x="32" y="39" textAnchor="middle">T</text>
+              </svg>
+            </span>
             <div>
               <p className="eyebrow">PAPER TRADING • NSE</p>
               <h1>TradeNexus <span>India</span></h1>
@@ -797,7 +852,13 @@ export default function TradeNexusIndia() {
               required
             />
 
-            <button className="login-submit" type="submit">Sign in</button>
+            <button
+              className="login-submit"
+              type="submit"
+              disabled={!loginIdentifier.trim() || !loginPassword.trim()}
+            >
+              Sign in
+            </button>
           </form>
 
           <p className="login-demo-note">Demo app: any valid email or mobile number and password will continue.</p>
