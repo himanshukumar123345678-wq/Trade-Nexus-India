@@ -2631,3 +2631,100 @@ body,
 .app-container:not(.login-container) .empty-state {
   border-color: rgba(229, 169, 60, 0.25);
 }
+
+.app-container:not(.login-container) .metric-cash {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.app-container:not(.login-container) .add-funds-button {
+  margin-top: 9px;
+  padding: 5px 9px;
+  border: 1px solid rgba(229, 169, 60, 0.48);
+  border-radius: 8px;
+  background: rgba(229, 169, 60, 0.1);
+  color: #f5d789;
+  font-size: 0.68rem;
+  font-weight: 750;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.app-container:not(.login-container) .add-funds-button:hover,
+.app-container:not(.login-container) .add-funds-button:focus-visible {
+  border-color: #f5c518;
+  background: rgba(229, 169, 60, 0.2);
+  box-shadow: 0 0 14px rgba(229, 169, 60, 0.16);
+}
+
+.app-container:not(.login-container) .add-funds-button:focus-visible {
+  outline: 2px solid rgba(245, 197, 24, 0.8);
+  outline-offset: 2px;
+}
+
+.funds-description {
+  margin: -9px 0 18px;
+  color: #aaa69d;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.funds-amount-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #e5dfd2;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.app-container:not(.login-container) .funds-amount-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid rgba(229, 169, 60, 0.42);
+  border-radius: 11px;
+  outline: none;
+  background: rgba(8, 10, 12, 0.78);
+  color: #f7f4ed;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.app-container:not(.login-container) .funds-amount-input::placeholder {
+  color: #89847a;
+}
+
+.app-container:not(.login-container) .funds-amount-input:focus {
+  border-color: #f5c518;
+  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.16);
+}
+
+.app-container:not(.login-container) .funds-amount-input:disabled {
+  opacity: 0.65;
+}
+
+.deposit-error {
+  margin: 9px 0 0;
+  color: #f29b80;
+  font-size: 0.78rem;
+}
+
+.app-container:not(.login-container) .funds-dialog .dialog-actions {
+  margin-top: 18px;
+}
+
+.app-container:not(.login-container) .funds-dialog .dialog-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  opacity: 0.55;
+}
+
+@media (max-width: 580px) {
+  .app-container:not(.login-container) .metric-cash {
+    min-height: 110px;
+  }
+
+  .app-container:not(.login-container) .funds-dialog {
+    padding: 22px 19px;
+  }
+}

@@ -4,6 +4,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 const INITIAL_CASH = 30000;
 
 const getLocalTradesKey = (user) => `tradeNexusTrades:${user}`;
+const getLocalDepositsKey = (user) => `tradeNexusDeposits:${user}`;
+
+const readLocalDeposits = (user) => {
+  const storedDeposits = localStorage.getItem(getLocalDepositsKey(user));
+  if (storedDeposits === null) return 0;
+
+  const deposits = Number(storedDeposits);
+  if (!Number.isFinite(deposits) || deposits < 0) {
+    throw new Error('Saved deposit data is invalid. Clear this browser’s deposit data to continue.');
+  }
+  return deposits;
+};
+
+const processMockPayment = async () =>
+  new Promise((resolve) => window.setTimeout(() => resolve(true), 700));
 
 const readLocalTrades = (user) => {
   const storedTrades = localStorage.getItem(getLocalTradesKey(user));
@@ -191,6 +206,10 @@ export default function TradeNexusIndia() {
   const [modal, setModal] = useState(null);
   const [tradeError, setTradeError] = useState(null);
   const [tradeSubmitting, setTradeSubmitting] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositError, setDepositError] = useState(null);
+  const [depositSubmitting, setDepositSubmitting] = useState(false);
   const [success, setSuccess] = useState(null);
   const [pnlHistory, setPnlHistory] = useState(() =>
     Array.from({ length: 12 }, (_, index) => ({
@@ -214,6 +233,7 @@ export default function TradeNexusIndia() {
     const loadOrders = async () => {
       setOrdersError(null);
       try {
+        setCash(INITIAL_CASH + readLocalDeposits(user));
         const response = await fetch(
           `/api/trades?userId=${encodeURIComponent(user)}`,
           { signal: controller.signal }
@@ -230,7 +250,7 @@ export default function TradeNexusIndia() {
 
         const portfolio = restorePortfolio(result);
         const loadedOrders = portfolio.orders;
-        setCash(portfolio.cash);
+        setCash(portfolio.cash + readLocalDeposits(user));
         setHoldings(portfolio.holdings);
         setOrders((currentOrders) => {
           const loadedIds = new Set(loadedOrders.map((order) => String(order.id)));
@@ -591,6 +611,36 @@ export default function TradeNexusIndia() {
     setUser(signedInUser);
   };
 
+  const handleDeposit = async (event) => {
+    event.preventDefault();
+    if (depositSubmitting) return;
+
+    const amount = Number(depositAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setDepositError('Enter a deposit amount greater than ₹0.');
+      return;
+    }
+
+    setDepositSubmitting(true);
+    setDepositError(null);
+    try {
+      const paymentSucceeded = await processMockPayment(amount);
+      if (!paymentSucceeded) {
+        throw new Error('Payment was not completed. Please try again.');
+      }
+
+      const updatedDeposits = Number((readLocalDeposits(user) + amount).toFixed(2));
+      localStorage.setItem(getLocalDepositsKey(user), String(updatedDeposits));
+      setCash((balance) => balance + amount);
+      setDepositAmount('');
+      setDepositOpen(false);
+    } catch (error) {
+      setDepositError(error.message || 'Could not complete the deposit.');
+    } finally {
+      setDepositSubmitting(false);
+    }
+  };
+
   const handleStockSearchChange = (value) => {
     const nextValue = value.trimStart();
     setSearch(nextValue);
@@ -892,6 +942,16 @@ export default function TradeNexusIndia() {
           <div className="metric-card metric-cash">
             <span className="metric-label">Available cash</span>
             <div className="metric-value">₹{cash.toFixed(0)}</div>
+            <button
+              type="button"
+              className="add-funds-button"
+              onClick={() => {
+                setDepositError(null);
+                setDepositOpen(true);
+              }}
+            >
+              + Add funds
+            </button>
           </div>
 
           <div className="metric-card metric-realized">
@@ -1674,6 +1734,54 @@ export default function TradeNexusIndia() {
             </section>
           </aside>
         </main>
+
+        {depositOpen && (
+          <div className="order-dialog-backdrop">
+            <section className="order-dialog funds-dialog" role="dialog" aria-modal="true" aria-labelledby="funds-dialog-title">
+              <p className="eyebrow">WALLET</p>
+              <h2 id="funds-dialog-title">Add funds</h2>
+              <p className="funds-description">Add money to your paper-trading balance. This uses a simulated payment and does not charge you.</p>
+              <form onSubmit={handleDeposit}>
+                <label className="funds-amount-label" htmlFor="deposit-amount">Deposit amount (₹)</label>
+                <input
+                  id="deposit-amount"
+                  className="funds-amount-input"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="Enter amount"
+                  value={depositAmount}
+                  onChange={(event) => setDepositAmount(event.target.value)}
+                  disabled={depositSubmitting}
+                  required
+                />
+                {depositError && <p className="deposit-error" role="alert">{depositError}</p>}
+                <div className="dialog-actions">
+                  <button
+                    type="button"
+                    className="dialog-button cancel-order-button"
+                    onClick={() => {
+                      setDepositOpen(false);
+                      setDepositAmount('');
+                      setDepositError(null);
+                    }}
+                    disabled={depositSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="dialog-button confirm-order-button"
+                    disabled={depositSubmitting || !Number.isFinite(Number(depositAmount)) || Number(depositAmount) <= 0}
+                  >
+                    {depositSubmitting ? 'Processing…' : 'Proceed'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
 
         {modal && (
           <div className="order-dialog-backdrop">
