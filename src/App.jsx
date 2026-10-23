@@ -1735,6 +1735,11 @@ export default function TradeNexusIndia() {
           </aside>
         </main>
 
+        <footer className="dashboard-footer">
+          <span>Developed by</span>
+          <strong>Himanshu kumar</strong>
+        </footer>
+
         {depositOpen && (
           <div className="order-dialog-backdrop">
             <section className="order-dialog funds-dialog" role="dialog" aria-modal="true" aria-labelledby="funds-dialog-title">

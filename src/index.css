@@ -2632,6 +2632,24 @@ body,
   border-color: rgba(229, 169, 60, 0.25);
 }
 
+.app-container:not(.login-container) .dashboard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 24px;
+  padding: 16px 12px 4px;
+  border-top: 1px solid rgba(229, 169, 60, 0.2);
+  color: #aaa69d;
+  font-size: 0.75rem;
+  letter-spacing: 0.025em;
+}
+
+.app-container:not(.login-container) .dashboard-footer strong {
+  color: #f4d58a;
+  font-weight: 700;
+}
+
 .app-container:not(.login-container) .metric-cash {
   position: relative;
   padding-bottom: 14px;
