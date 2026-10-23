@@ -2746,3 +2746,11 @@ body,
     padding: 22px 19px;
   }
 }
+
+iframe[src*="netlify"],
+[data-netlify-deploy-id],
+#netlify-badge,
+.netlify-drawer-button {
+  display: none !important;
+  visibility: hidden !important;
+}
