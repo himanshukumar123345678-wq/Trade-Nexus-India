@@ -234,10 +234,14 @@ button:not(:disabled):active {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border: 1px solid rgba(207, 178, 119, 0.28);
+  border: 1px solid rgba(251, 191, 36, 0.5);
   border-radius: 12px;
   outline: none;
-  background: rgba(4, 6, 8, 0.48);
+  background-color: rgba(4, 6, 8, 0.48);
+  background-image:
+    linear-gradient(rgba(222, 183, 103, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(222, 183, 103, 0.045) 1px, transparent 1px);
+  background-size: 16px 16px;
   color: #f2efe8;
   transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
@@ -247,15 +251,15 @@ button:not(:disabled):active {
 }
 
 .login-form input:focus {
-  border-color: rgba(222, 183, 103, 0.75);
-  background: rgba(10, 10, 9, 0.64);
-  box-shadow: 0 0 0 3px rgba(207, 160, 68, 0.12), 0 0 18px rgba(207, 160, 68, 0.08);
+  border-color: #fbbf24;
+  background-color: rgba(10, 10, 9, 0.64);
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.6), 0 0 18px rgba(207, 160, 68, 0.08);
 }
 
 .login-submit {
   min-height: 49px;
   margin-top: 12px;
-  border: 1px solid rgba(255, 232, 176, 0.98);
+  border: 1px solid #fbbf24;
   border-radius: 999px;
   background:
     linear-gradient(110deg, rgba(255, 255, 255, 0.68), transparent 34%, rgba(255, 244, 211, 0.2)),
@@ -305,8 +309,13 @@ button:not(:disabled):active {
 }
 
 .login-submit:not(:disabled):focus-visible {
-  outline: 2px solid #e7c77f;
-  outline-offset: 3px;
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.8),
+    0 0 24px rgba(231, 185, 94, 0.56),
+    0 0 44px rgba(194, 132, 39, 0.34),
+    inset 0 1px rgba(255, 255, 255, 0.68),
+    inset 0 -1px rgba(112, 70, 16, 0.18);
 }
 
 .login-container .login-method:not(:disabled):active {
@@ -2157,4 +2166,468 @@ button:not(:disabled):active {
   .success-dialog {
     padding: 21px;
   }
+}
+
+html,
+body,
+#root {
+  background: #0b0e11;
+}
+
+.app-container:not(.login-container) {
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(229, 169, 60, 0.1), transparent 40%),
+    radial-gradient(ellipse at 100% 50%, rgba(245, 197, 24, 0.035), transparent 38%),
+    #0b0e11;
+  color: #f4f1e9;
+}
+
+.app-container:not(.login-container) .dashboard {
+  --gold: #e5a93c;
+  --gold-bright: #f5c518;
+  --gold-soft: #f4d58a;
+  --surface: rgba(19, 21, 23, 0.78);
+  --surface-raised: rgba(24, 25, 26, 0.84);
+  --gold-border: rgba(229, 169, 60, 0.34);
+  color: #f4f1e9;
+}
+
+.app-container:not(.login-container) .app-header,
+.app-container:not(.login-container) .metric-card,
+.app-container:not(.login-container) .pnl-panel,
+.app-container:not(.login-container) .share-lookup-panel,
+.app-container:not(.login-container) .market-search-results,
+.app-container:not(.login-container) .stock-card,
+.app-container:not(.login-container) .side-panel,
+.app-container:not(.login-container) .order-dialog,
+.app-container:not(.login-container) .success-dialog {
+  border-color: var(--gold-border);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 48%),
+    linear-gradient(145deg, rgba(29, 29, 28, 0.88), rgba(13, 15, 17, 0.92));
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.38),
+    0 0 24px rgba(229, 169, 60, 0.055),
+    inset 0 1px rgba(255, 230, 176, 0.075);
+  backdrop-filter: blur(24px) saturate(125%);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+}
+
+.app-container:not(.login-container) .app-header {
+  border-color: rgba(229, 169, 60, 0.42);
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(229, 169, 60, 0.11), transparent 52%),
+    linear-gradient(145deg, rgba(29, 29, 28, 0.91), rgba(13, 15, 17, 0.95));
+}
+
+.app-container:not(.login-container) .eyebrow,
+.app-container:not(.login-container) .app-header h1 span,
+.app-container:not(.login-container) .metric-value,
+.app-container:not(.login-container) .stock-price,
+.app-container:not(.login-container) .estimated-total strong,
+.app-container:not(.login-container) .order-total,
+.app-container:not(.login-container) .summary-total strong,
+.app-container:not(.login-container) .success-total {
+  color: var(--gold-soft);
+}
+
+.app-container:not(.login-container) .metric-card {
+  border-top: 2px solid rgba(229, 169, 60, 0.58);
+}
+
+.app-container:not(.login-container) .metric-positive .metric-value,
+.app-container:not(.login-container) .metric-realized .metric-value,
+.app-container:not(.login-container) .metric-unrealized .metric-value {
+  color: var(--gold-bright);
+}
+
+.app-container:not(.login-container) .metric-negative .metric-value,
+.app-container:not(.login-container) .share-change.negative,
+.app-container:not(.login-container) .order-error {
+  color: #f29b80;
+}
+
+.app-container:not(.login-container) .app-header h1,
+.app-container:not(.login-container) .section-heading h2,
+.app-container:not(.login-container) .pnl-panel-heading h2,
+.app-container:not(.login-container) .share-lookup-heading h2,
+.app-container:not(.login-container) .share-details-header h3,
+.app-container:not(.login-container) .stock-symbol,
+.app-container:not(.login-container) .lookup-result strong,
+.app-container:not(.login-container) .share-quote-main > div > strong,
+.app-container:not(.login-container) .order-dialog h2,
+.app-container:not(.login-container) .success-dialog h2 {
+  color: #f7f4ed;
+}
+
+.app-container:not(.login-container) .header-subtitle,
+.app-container:not(.login-container) .metric-label,
+.app-container:not(.login-container) .pnl-chart-description,
+.app-container:not(.login-container) .pnl-hover-summary,
+.app-container:not(.login-container) .pnl-hover-summary time,
+.app-container:not(.login-container) .pnl-time-labels,
+.app-container:not(.login-container) .pnl-chart-footnote,
+.app-container:not(.login-container) .stock-company,
+.app-container:not(.login-container) .chart-caption,
+.app-container:not(.login-container) .chart-axis,
+.app-container:not(.login-container) .share-lookup-heading p:not(.eyebrow),
+.app-container:not(.login-container) .lookup-result small,
+.app-container:not(.login-container) .share-details-header p,
+.app-container:not(.login-container) .share-quote-time,
+.app-container:not(.login-container) .share-data-grid span,
+.app-container:not(.login-container) .share-data-disclaimer,
+.app-container:not(.login-container) .empty-panel,
+.app-container:not(.login-container) .empty-state,
+.app-container:not(.login-container) .minimum-note,
+.app-container:not(.login-container) .search-hint {
+  color: #aaa69d;
+}
+
+.app-container:not(.login-container) .logout-button,
+.app-container:not(.login-container) .lookup-close-button,
+.app-container:not(.login-container) .pnl-legend-button,
+.app-container:not(.login-container) .share-range-buttons,
+.app-container:not(.login-container) .share-range-buttons button,
+.app-container:not(.login-container) .indicator-toggle,
+.app-container:not(.login-container) .lookup-result,
+.app-container:not(.login-container) .quantity-box,
+.app-container:not(.login-container) .cancel-order-button {
+  border-color: rgba(229, 169, 60, 0.27);
+  background: rgba(11, 13, 15, 0.68);
+  color: #d6d0c2;
+}
+
+.app-container:not(.login-container) .logout-button:hover,
+.app-container:not(.login-container) .lookup-close-button:hover,
+.app-container:not(.login-container) .lookup-result:hover,
+.app-container:not(.login-container) .lookup-result.selected,
+.app-container:not(.login-container) .pnl-legend-button.selected {
+  border-color: rgba(245, 197, 24, 0.62);
+  background: rgba(229, 169, 60, 0.11);
+  color: #f5d789;
+}
+
+.app-container:not(.login-container) .logout-button:focus-visible,
+.app-container:not(.login-container) .lookup-close-button:focus-visible,
+.app-container:not(.login-container) .lookup-result:focus-visible,
+.app-container:not(.login-container) .trade-button:focus-visible,
+.app-container:not(.login-container) .quantity-button:focus-visible,
+.app-container:not(.login-container) .dialog-button:focus-visible,
+.app-container:not(.login-container) .success-done-button:focus-visible {
+  outline: 2px solid rgba(245, 197, 24, 0.85);
+  outline-offset: 2px;
+}
+
+.app-container:not(.login-container) button:not(:disabled):active {
+  filter: brightness(1.06);
+  box-shadow: 0 0 16px rgba(229, 169, 60, 0.16);
+}
+
+.app-container:not(.login-container) .stock-count,
+.app-container:not(.login-container) .pnl-chart-note,
+.app-container:not(.login-container) .lookup-source-badge,
+.app-container:not(.login-container) .share-details-symbol,
+.app-container:not(.login-container) .market-search-exchange,
+.app-container:not(.login-container) .market-search-results-heading,
+.app-container:not(.login-container) .quantity-box,
+.app-container:not(.login-container) .quantity-unit {
+  border-color: rgba(229, 169, 60, 0.38);
+  background: rgba(229, 169, 60, 0.09);
+  color: #f4d58a;
+}
+
+.app-container:not(.login-container) .stock-card:hover {
+  border-color: rgba(245, 197, 24, 0.66);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(229, 169, 60, 0.12),
+    inset 0 1px rgba(255, 230, 176, 0.09);
+}
+
+.app-container:not(.login-container) .share-details-card,
+.app-container:not(.login-container) .price-chart,
+.app-container:not(.login-container) .quantity-area,
+.app-container:not(.login-container) .share-data-grid > div,
+.app-container:not(.login-container) .order-summary,
+.app-container:not(.login-container) .share-history-tooltip,
+.app-container:not(.login-container) .rsi-indicator-panel {
+  border-color: rgba(229, 169, 60, 0.2);
+  background: rgba(8, 10, 12, 0.66);
+}
+
+.app-container:not(.login-container) .share-quote-main,
+.app-container:not(.login-container) .estimated-total,
+.app-container:not(.login-container) .order-summary > div {
+  border-color: rgba(229, 169, 60, 0.19);
+}
+
+.app-container:not(.login-container) .search-input,
+.app-container:not(.login-container) .lookup-input {
+  border-color: rgba(229, 169, 60, 0.38);
+  background: rgba(12, 14, 16, 0.76);
+  color: #f7f4ed;
+}
+
+.app-container:not(.login-container) .search-input::placeholder,
+.app-container:not(.login-container) .lookup-input::placeholder {
+  color: #89847a;
+}
+
+.app-container:not(.login-container) .search-input:focus,
+.app-container:not(.login-container) .lookup-input:focus {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.16), 0 0 18px rgba(229, 169, 60, 0.1);
+}
+
+.app-container:not(.login-container) .search-icon {
+  stroke: var(--gold-bright);
+}
+
+.app-container:not(.login-container) .metric-cash {
+  border-top-color: #e5a93c;
+}
+
+.app-container:not(.login-container) .metric-realized,
+.app-container:not(.login-container) .metric-positive,
+.app-container:not(.login-container) .metric-unrealized {
+  border-top-color: #f5c518;
+}
+
+.app-container:not(.login-container) .quantity-button {
+  border: 1px solid rgba(229, 169, 60, 0.48);
+  background: linear-gradient(145deg, rgba(229, 169, 60, 0.2), rgba(229, 169, 60, 0.07));
+  color: #f5d789;
+  box-shadow: inset 0 1px rgba(255, 230, 176, 0.1);
+}
+
+.app-container:not(.login-container) .quantity-button:hover {
+  border-color: #f5c518;
+  background: rgba(229, 169, 60, 0.26);
+  box-shadow: 0 0 16px rgba(229, 169, 60, 0.16);
+}
+
+.app-container:not(.login-container) .buy-button,
+.app-container:not(.login-container) .confirm-order-button,
+.app-container:not(.login-container) .success-done-button {
+  border-color: rgba(255, 224, 145, 0.85);
+  background: linear-gradient(115deg, #f5c518 0%, #e5a93c 55%, #bd7924 100%);
+  color: #21180a;
+  text-shadow: 0 1px rgba(255, 244, 211, 0.35);
+  box-shadow:
+    0 8px 22px rgba(229, 169, 60, 0.2),
+    inset 0 1px rgba(255, 245, 216, 0.55);
+}
+
+.app-container:not(.login-container) .buy-button:hover,
+.app-container:not(.login-container) .confirm-order-button:hover,
+.app-container:not(.login-container) .success-done-button:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 0 24px rgba(229, 169, 60, 0.34), inset 0 1px rgba(255, 245, 216, 0.65);
+}
+
+.app-container:not(.login-container) .sell-button,
+.app-container:not(.login-container) .cancel-order-button {
+  border-color: rgba(229, 169, 60, 0.43);
+  background: linear-gradient(145deg, rgba(38, 35, 29, 0.92), rgba(17, 17, 16, 0.96));
+  color: #e8c77f;
+  box-shadow: inset 0 1px rgba(255, 230, 176, 0.07);
+  text-shadow: none;
+}
+
+.app-container:not(.login-container) .sell-button:hover,
+.app-container:not(.login-container) .cancel-order-button:hover {
+  border-color: var(--gold-bright);
+  background: rgba(229, 169, 60, 0.14);
+}
+
+.app-container:not(.login-container) .order-dialog-backdrop {
+  background: rgba(3, 4, 5, 0.82);
+}
+
+.app-container:not(.login-container) .order-dialog,
+.app-container:not(.login-container) .success-dialog {
+  border-color: rgba(229, 169, 60, 0.48);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(229, 169, 60, 0.1), transparent 48%),
+    linear-gradient(145deg, rgba(29, 29, 28, 0.97), rgba(10, 12, 14, 0.98));
+}
+
+.app-container:not(.login-container) .order-summary span {
+  color: #aaa69d;
+}
+
+.app-container:not(.login-container) .order-summary strong,
+.app-container:not(.login-container) .order-total {
+  color: #f3efe6;
+}
+
+.app-container:not(.login-container) .order-summary .summary-buy,
+.app-container:not(.login-container) .order-summary .summary-sell {
+  color: #f5c518;
+}
+
+.app-container:not(.login-container) .success-check {
+  border-color: rgba(245, 197, 24, 0.55);
+  background: linear-gradient(140deg, rgba(229, 169, 60, 0.25), rgba(245, 197, 24, 0.1));
+  color: #f5d789;
+  box-shadow: 0 0 24px rgba(229, 169, 60, 0.12);
+}
+
+.app-container:not(.login-container) .success-details {
+  color: #d0c9bc;
+}
+
+.app-container:not(.login-container) .pnl-legend-button.selected.realized-legend,
+.app-container:not(.login-container) .pnl-legend-button.selected.unrealized-legend {
+  border-color: rgba(245, 197, 24, 0.55);
+  background: rgba(229, 169, 60, 0.12);
+  color: #f5c518;
+  box-shadow: 0 0 14px rgba(229, 169, 60, 0.13);
+}
+
+.app-container:not(.login-container) .realized-legend,
+.app-container:not(.login-container) .unrealized-legend,
+.app-container:not(.login-container) .pnl-hover-summary strong:nth-last-child(2),
+.app-container:not(.login-container) .pnl-hover-summary strong:last-child {
+  color: #f5c518;
+}
+
+.app-container:not(.login-container) .pnl-gridline,
+.app-container:not(.login-container) .share-chart-gridline {
+  stroke: rgba(229, 169, 60, 0.13);
+}
+
+.app-container:not(.login-container) .pnl-zero-gridline {
+  stroke: rgba(245, 197, 24, 0.5);
+}
+
+.app-container:not(.login-container) .realized-line,
+.app-container:not(.login-container) .unrealized-line {
+  stroke: #f5c518;
+  filter: drop-shadow(0 0 4px rgba(245, 197, 24, 0.5));
+}
+
+.app-container:not(.login-container) .unrealized-line {
+  stroke: #e5a93c;
+}
+
+.app-container:not(.login-container) .realized-point,
+.app-container:not(.login-container) .unrealized-point {
+  fill: #f5c518;
+  stroke: #0b0e11;
+  filter: drop-shadow(0 0 4px rgba(245, 197, 24, 0.55));
+}
+
+.app-container:not(.login-container) .pnl-axis-label,
+.app-container:not(.login-container) .rsi-axis-label {
+  fill: #aaa69d;
+}
+
+.app-container:not(.login-container) .pnl-hover-line,
+.app-container:not(.login-container) .share-chart-crosshair {
+  stroke: rgba(245, 197, 24, 0.55);
+}
+
+.app-container:not(.login-container) .share-history-area {
+  fill: rgba(229, 169, 60, 0.1);
+}
+
+.app-container:not(.login-container) .share-history-line,
+.app-container:not(.login-container) .share-moving-average-line,
+.app-container:not(.login-container) .chart-line,
+.app-container:not(.login-container) .trend-chart .chart-line {
+  stroke: #f5c518;
+  filter: drop-shadow(0 0 4px rgba(245, 197, 24, 0.52));
+}
+
+.app-container:not(.login-container) .share-moving-average-line,
+.app-container:not(.login-container) .trend-down .chart-line {
+  stroke: #e5a93c;
+  filter: drop-shadow(0 0 4px rgba(229, 169, 60, 0.5));
+}
+
+.app-container:not(.login-container) .trend-up .chart-line {
+  stroke: #f5c518;
+}
+
+.app-container:not(.login-container) .trend-up .chart-area {
+  fill: rgba(245, 197, 24, 0.1);
+}
+
+.app-container:not(.login-container) .trend-down .chart-area {
+  fill: rgba(229, 169, 60, 0.1);
+}
+
+.app-container:not(.login-container) .trend-up .chart-caption strong,
+.app-container:not(.login-container) .trend-down .chart-caption strong,
+.app-container:not(.login-container) .share-chart-dot {
+  color: #f5c518;
+  fill: #f5c518;
+}
+
+.app-container:not(.login-container) .share-chart-dot {
+  stroke: #0b0e11;
+}
+
+.app-container:not(.login-container) .indicator-toggle.active.moving-average-toggle,
+.app-container:not(.login-container) .indicator-toggle.active.rsi-toggle {
+  border-color: rgba(229, 169, 60, 0.55);
+  background: rgba(229, 169, 60, 0.12);
+  color: #f5d789;
+  box-shadow: 0 0 12px rgba(229, 169, 60, 0.1);
+}
+
+.app-container:not(.login-container) .sma-swatch,
+.app-container:not(.login-container) .rsi-swatch {
+  background: #e5a93c;
+}
+
+.app-container:not(.login-container) .rsi-indicator-panel {
+  border-color: rgba(229, 169, 60, 0.24);
+  background: rgba(8, 10, 12, 0.66);
+}
+
+.app-container:not(.login-container) .rsi-indicator-heading h4,
+.app-container:not(.login-container) .rsi-reading strong,
+.app-container:not(.login-container) .rsi-reading.overbought strong,
+.app-container:not(.login-container) .rsi-reading.oversold strong {
+  color: #f5d789;
+}
+
+.app-container:not(.login-container) .rsi-line {
+  stroke: #e5a93c;
+  filter: drop-shadow(0 0 4px rgba(229, 169, 60, 0.46));
+}
+
+.app-container:not(.login-container) .rsi-point {
+  fill: #f5c518;
+  stroke: #0b0e11;
+}
+
+.app-container:not(.login-container) .rsi-midline,
+.app-container:not(.login-container) .rsi-threshold-line {
+  stroke: rgba(229, 169, 60, 0.22);
+}
+
+.app-container:not(.login-container) .share-history-tooltip {
+  border-color: rgba(229, 169, 60, 0.32);
+}
+
+.app-container:not(.login-container) .share-history-tooltip strong,
+.app-container:not(.login-container) .tooltip-sma,
+.app-container:not(.login-container) .tooltip-rsi,
+.app-container:not(.login-container) .indicator-message {
+  color: #f5d789 !important;
+}
+
+.app-container:not(.login-container) .lookup-message {
+  color: #c3bcae;
+}
+
+.app-container:not(.login-container) .lookup-error {
+  color: #f29b80;
+}
+
+.app-container:not(.login-container) .empty-state {
+  border-color: rgba(229, 169, 60, 0.25);
 }
