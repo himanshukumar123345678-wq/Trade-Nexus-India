@@ -1,0 +1,50 @@
+Attached Element Context from Integrated Browser
+
+Element: div.pnl-chart-toolbar
+
+URL: http://localhost:5173/
+
+HTML Path: div#root > div.app-container > div.dashboard > section.pnl-panel > div.pnl-chart-toolbar
+
+Outer HTML:
+```html
+<div class="pnl-chart-toolbar"><div class="pnl-range-buttons" role="group" aria-label="P&amp;L chart time range"><button type="button" class="" aria-pressed="false">1H</button><button type="button" class="active" aria-pressed="true">1D</button><button type="button" class="" aria-pressed="false">1W</button><button type="button" class="" aria-pressed="false">1M</button></div><div class="pnl-chart-legend" aria-label="Toggle chart lines"><button type="button" class="pnl-legend-button realized-legend selected" aria-pressed="true"><span class="legend-swatch" aria-hidden="true"></span>Realized P&amp;L</button><button type="button" class="pnl-legend-button unrealized-legend selected" aria-pressed="true"><span class="legend-swatch" aria-hidden="true"></span>Unrealized P&amp;L</button><button type="button" class="pnl-legend-button points-legend selected" aria-pressed="true"><span class="legend-point-swatch" aria-hidden="true"></span>Points On</button></div><div class="pnl-sign-legend" aria-label="P&amp;L colors"><span><i class="profit-swatch"></i> Profit</span><span><i class="loss-swatch"></i> Loss</span></div><div class="pnl-hover-summary" aria-live="polite"><span>Latest update</span><strong>Realized ₹0</strong><strong>Unrealized ₹0</strong></div></div>
+```
+
+Dimensions:
+- top: 40px
+- left: 43px
+- width: 498px
+- height: 136px
+
+CSS:
+```css
+* { box-sizing: border-box; }
+.pnl-panel-heading, .pnl-chart-toolbar { display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px; }
+.pnl-chart-toolbar { align-items: center;
+  flex-wrap: wrap;
+  margin-top: 15px; }
+
+/* Inherited */
+.app-container:not(.login-container) .dashboard { color: #f4f1e9 }
+.app-container { color: #e5eef9 }
+html, body, #root { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif }
+
+/* Resolved values */
+align-items: center;
+box-sizing: border-box;
+color: rgb(244, 241, 233);
+column-gap: 20px;
+display: flex;
+flex-wrap: wrap;
+font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+height: 121px;
+justify-content: space-between;
+margin-top: 15px;
+row-gap: 20px;
+unicode-bidi: isolate /*UA*/;
+width: 497.76px;
+```

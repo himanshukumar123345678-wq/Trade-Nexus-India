@@ -1,0 +1,114 @@
+Attached Element Context from Integrated Browser
+
+Element: button.pnl-legend-button.points-legend.selected
+
+URL: http://localhost:5173/
+
+HTML Path: div#root > div.app-container > div.dashboard > section.pnl-panel > div.pnl-chart-toolbar > div.pnl-chart-legend > button.pnl-legend-button.points-legend.selected
+
+Outer HTML:
+```html
+<button type="button" class="pnl-legend-button points-legend selected" aria-pressed="true"><span class="legend-point-swatch" aria-hidden="true"></span>Points On</button>
+```
+
+Dimensions:
+- top: 109px
+- left: 296px
+- width: 84px
+- height: 32px
+
+CSS:
+```css
+* { box-sizing: border-box; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.pnl-legend-button { display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: rgba(7, 23, 41, 0.22);
+  color: #8da4ba;
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.65;
+  transition: opacity 150ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.points-legend { color: #c4b5fd; }
+.pnl-legend-button.selected { border-color: currentColor;
+  background: rgba(7, 23, 41, 0.52);
+  color: #e5eef9;
+  opacity: 1; }
+.pnl-legend-button:hover { transform: translateY(-1px); }
+.app-container:not(.login-container) .logout-button, .app-container:not(.login-container) .lookup-close-button, .app-container:not(.login-container) .pnl-legend-button, .app-container:not(.login-container) .share-range-buttons, .app-container:not(.login-container) .share-range-buttons button, .app-container:not(.login-container) .indicator-toggle, .app-container:not(.login-container) .lookup-result, .app-container:not(.login-container) .quantity-box, .app-container:not(.login-container) .cancel-order-button { border-color: rgba(229, 169, 60, 0.27);
+  background: rgba(11, 13, 15, 0.68);
+  color: #d6d0c2; }
+.app-container:not(.login-container) .logout-button:hover, .app-container:not(.login-container) .lookup-close-button:hover, .app-container:not(.login-container) .lookup-result:hover, .app-container:not(.login-container) .lookup-result.selected, .app-container:not(.login-container) .pnl-legend-button.selected { border-color: rgba(245, 197, 24, 0.62);
+  background: rgba(229, 169, 60, 0.11);
+  color: #f5d789; }
+
+/* Inherited */
+.app-container:not(.login-container) .dashboard { color: #f4f1e9 }
+.app-container { color: #e5eef9 }
+html, body, #root { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif }
+
+/* Resolved values */
+margin: 0px /*UA*/;
+padding: 5px 9px;
+border-radius: 9px;
+border: 0.64px solid rgba(245, 197, 24, 0.62);
+transition: opacity 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+align-items: center;
+appearance: auto /*UA*/;
+background-attachment: scroll;
+background-clip: border-box;
+background-color: rgba(229, 169, 60, 0.11);
+background-image: none;
+background-origin: padding-box;
+background-position-x: 0%;
+background-position-y: 0%;
+background-repeat: repeat;
+background-size: auto;
+box-sizing: border-box;
+color: rgb(245, 215, 137);
+column-gap: 7px;
+cursor: pointer;
+display: flex;
+font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+font-feature-settings: normal;
+font-kerning: auto;
+font-language-override: normal;
+font-optical-sizing: auto;
+font-size: 11.2px;
+font-size-adjust: none;
+font-stretch: 100%;
+font-style: normal;
+font-variant-alternates: normal;
+font-variant-caps: normal;
+font-variant-east-asian: normal;
+font-variant-emoji: normal;
+font-variant-ligatures: normal;
+font-variant-numeric: normal;
+font-variant-position: normal;
+font-variation-settings: normal;
+font-weight: 700;
+height: 32px;
+letter-spacing: normal /*UA*/;
+line-height: normal;
+min-height: 32px;
+opacity: 1;
+padding-block-end: 5px /*UA*/;
+padding-block-start: 5px /*UA*/;
+padding-inline-end: 9px /*UA*/;
+padding-inline-start: 9px /*UA*/;
+row-gap: 7px;
+text-align: center /*UA*/;
+text-indent: 0px /*UA*/;
+text-rendering: auto /*UA*/;
+text-shadow: none /*UA*/;
+text-transform: none /*UA*/;
+transform: matrix(1, 0, 0, 1, 0, -1);
+width: 84.28px;
+word-spacing: 0px /*UA*/;
+```
