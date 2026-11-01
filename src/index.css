@@ -355,6 +355,33 @@ button:not(:disabled):active {
   -webkit-backdrop-filter: blur(28px) saturate(165%);
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-download-trigger {
+  padding: 10px 15px;
+  border: 1px solid rgba(255, 215, 0, 0.55);
+  border-radius: 12px;
+  background: rgba(255, 215, 0, 0.1);
+  color: #ffe66d;
+  font-weight: 750;
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.dashboard-download-trigger:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 215, 0, 0.17);
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.22);
+}
+
+.dashboard-download-trigger:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 3px;
+}
+
 .app-header h1 {
   margin: 3px 0 2px;
   color: #f4f8ff;
@@ -2081,6 +2108,17 @@ button:not(:disabled):active {
     border-radius: 18px;
   }
 
+  .app-header-actions {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .app-header-actions button {
+    padding: 9px 11px;
+    font-size: 0.78rem;
+  }
+
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -2758,4 +2796,156 @@ div[class*="netlify"] {
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+.apk-modal-backdrop {
+  z-index: 30;
+  animation: apk-backdrop-appear 180ms ease-out both;
+}
+
+.apk-download-modal {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 36px 32px 30px;
+  border: 1px solid rgba(255, 215, 0, 0.78);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 215, 0, 0.13), transparent 58%),
+    linear-gradient(145deg, #1a1914, #0d0e0e 76%);
+  color: #f7f4ed;
+  text-align: center;
+  box-shadow:
+    0 0 18px rgba(255, 215, 0, 0.24),
+    0 0 48px rgba(255, 215, 0, 0.12),
+    0 24px 80px rgba(0, 0, 0, 0.65),
+    inset 0 1px rgba(255, 245, 180, 0.16);
+  animation: apk-modal-pop 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.apk-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 215, 0, 0.06);
+  color: #ffe66d;
+  font-size: 1.55rem;
+  line-height: 1;
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+
+.apk-modal-close:hover {
+  background: rgba(255, 215, 0, 0.16);
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.2);
+}
+
+.apk-modal-close:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
+}
+
+.apk-modal-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  margin: 0 auto 17px;
+  border: 1px solid rgba(255, 215, 0, 0.58);
+  border-radius: 18px;
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.18), inset 0 1px rgba(255, 245, 180, 0.12);
+}
+
+.apk-modal-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: #ffd700;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.apk-modal-eyebrow {
+  margin: 0 0 9px;
+  color: #ffd700;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.apk-download-modal h2 {
+  margin: 0;
+  color: #fff8d6;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.apk-download-modal > p:not(.apk-modal-eyebrow) {
+  margin: 13px 0 22px;
+  color: #bcb7a5;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.apk-download-button {
+  display: flex;
+  min-height: 49px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid #ffe766;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #ffe766, #ffd700 60%, #e8b900);
+  color: #211a00;
+  font-size: 0.9rem;
+  font-weight: 850;
+  text-decoration: none;
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.34), 0 7px 20px rgba(255, 215, 0, 0.15);
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+}
+
+.apk-download-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 0 28px rgba(255, 215, 0, 0.5), 0 9px 24px rgba(255, 215, 0, 0.2);
+}
+
+.apk-download-button:focus-visible {
+  outline: 3px solid #fff2a3;
+  outline-offset: 3px;
+}
+
+@keyframes apk-backdrop-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes apk-modal-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apk-modal-backdrop,
+  .apk-download-modal {
+    animation: none;
+  }
+}
+
+@media (max-width: 580px) {
+  .apk-download-modal {
+    padding: 34px 22px 24px;
+  }
+
+  .apk-download-modal h2 {
+    font-size: 1.35rem;
+  }
 }

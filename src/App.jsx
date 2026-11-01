@@ -167,6 +167,7 @@ export default function TradeNexusIndia() {
   const [user, setUser] = useState(() =>
     localStorage.getItem('tradeNexusUser')
   );
+  const [apkModalOpen, setApkModalOpen] = useState(false);
   const [loginMethod, setLoginMethod] = useState('email');
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -221,6 +222,21 @@ export default function TradeNexusIndia() {
   const [hoveredPnlIndex, setHoveredPnlIndex] = useState(null);
   const [showRealized, setShowRealized] = useState(true);
   const [showUnrealized, setShowUnrealized] = useState(true);
+
+  useEffect(() => {
+    setApkModalOpen(Boolean(user));
+  }, [user]);
+
+  useEffect(() => {
+    if (!apkModalOpen) return undefined;
+
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setApkModalOpen(false);
+    };
+
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [apkModalOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -927,15 +943,24 @@ export default function TradeNexusIndia() {
             <p className="header-subtitle">Your market, at a glance</p>
           </div>
 
-          <button
-            className="logout-button"
-            onClick={() => {
-              localStorage.removeItem('tradeNexusUser');
-              setUser(null);
-            }}
-          >
-            Logout
-          </button>
+          <div className="app-header-actions">
+            <button
+              className="dashboard-download-trigger"
+              type="button"
+              onClick={() => setApkModalOpen(true)}
+            >
+              Get Android app
+            </button>
+            <button
+              className="logout-button"
+              onClick={() => {
+                localStorage.removeItem('tradeNexusUser');
+                setUser(null);
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </header>
 
         <section className="metrics-grid" aria-label="Portfolio summary">
@@ -1739,6 +1764,49 @@ export default function TradeNexusIndia() {
           <span>Developed by</span>
           <strong>Himanshu kumar</strong>
         </footer>
+
+        {apkModalOpen && (
+          <div
+            className="order-dialog-backdrop apk-modal-backdrop"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setApkModalOpen(false);
+            }}
+          >
+            <section
+              className="apk-download-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="apk-modal-title"
+              aria-describedby="apk-modal-description"
+            >
+              <button
+                className="apk-modal-close"
+                type="button"
+                aria-label="Close download dialog"
+                onClick={() => setApkModalOpen(false)}
+              >
+                ×
+              </button>
+              <span className="apk-modal-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 16v3h14v-3" />
+                </svg>
+              </span>
+              <p className="apk-modal-eyebrow">TRADE NEXUS • ANDROID</p>
+              <h2 id="apk-modal-title">Take your trading dashboard with you</h2>
+              <p id="apk-modal-description">
+                Download the Android app to keep TradeNexus close wherever you go.
+              </p>
+              <a
+                className="apk-download-button"
+                href="/TradeNexus-India.apk"
+                download="TradeNexus-India.apk"
+              >
+                Download Android app
+              </a>
+            </section>
+          </div>
+        )}
 
         {depositOpen && (
           <div className="order-dialog-backdrop">

@@ -30,6 +30,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: ['localhost', '127.0.0.1', '0.0.0.0', '.loca.lt'],
+    watch: {
+      ignored: ['**/public/TradeNexus-India.apk'],
+    },
     proxy: yahooFinanceProxy,
   },
   preview: {
