@@ -491,14 +491,15 @@ button:not(:disabled):active {
 .pnl-panel {
   margin-bottom: 22px;
   padding: 20px 22px 16px;
-  border: 1px solid rgba(186, 230, 253, 0.32);
+  border: 1px solid rgba(50, 255, 164, 0.2);
   border-radius: 19px;
   background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.09), transparent 45%),
-    linear-gradient(145deg, rgba(191, 230, 255, 0.15), rgba(255, 255, 255, 0.06));
-  box-shadow: 0 14px 34px rgba(3, 12, 25, 0.21), inset 0 1px rgba(255, 255, 255, 0.17);
-  backdrop-filter: blur(26px) saturate(165%);
-  -webkit-backdrop-filter: blur(26px) saturate(165%);
+    radial-gradient(ellipse at 82% 0%, rgba(19, 255, 145, 0.055), transparent 38%),
+    linear-gradient(145deg, #0b1115 0%, #070b0e 60%, #090d11 100%);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.38),
+    0 0 24px rgba(19, 255, 145, 0.045),
+    inset 0 1px rgba(255, 255, 255, 0.045);
 }
 
 .pnl-panel-heading,
@@ -535,7 +536,42 @@ button:not(:disabled):active {
 
 .pnl-chart-toolbar {
   align-items: center;
+  flex-wrap: wrap;
   margin-top: 15px;
+}
+
+.pnl-range-buttons {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(140, 164, 174, 0.16);
+  border-radius: 9px;
+  background: rgba(3, 8, 11, 0.78);
+}
+
+.pnl-range-buttons button {
+  min-width: 35px;
+  min-height: 27px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #788b91;
+  font-size: 0.64rem;
+  font-weight: 800;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.pnl-range-buttons button.active {
+  background: rgba(21, 255, 145, 0.14);
+  color: #8dffc3;
+  box-shadow: inset 0 0 0 1px rgba(21, 255, 145, 0.23), 0 0 12px rgba(21, 255, 145, 0.1);
+}
+
+.pnl-range-buttons button:focus-visible {
+  outline: 2px solid #15ff91;
+  outline-offset: 2px;
 }
 
 .pnl-chart-legend {
@@ -568,17 +604,15 @@ button:not(:disabled):active {
 }
 
 .pnl-legend-button.selected.realized-legend {
-  border-color: rgba(125, 211, 252, 0.54);
-  background: linear-gradient(110deg, rgba(56, 189, 248, 0.19), rgba(7, 23, 41, 0.48));
-  color: #7dd3fc;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.2), inset 0 1px rgba(255, 255, 255, 0.14);
+  border-color: rgba(21, 255, 145, 0.35);
+  background: rgba(21, 255, 145, 0.07);
+  color: #b7c8c0;
 }
 
 .pnl-legend-button.selected.unrealized-legend {
-  border-color: rgba(251, 191, 36, 0.56);
-  background: linear-gradient(110deg, rgba(251, 191, 36, 0.17), rgba(7, 23, 41, 0.48));
-  color: #fbbf24;
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.2), inset 0 1px rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 54, 95, 0.33);
+  background: rgba(255, 54, 95, 0.06);
+  color: #b9bfc2;
 }
 
 .pnl-legend-button:hover {
@@ -604,11 +638,54 @@ button:not(:disabled):active {
 }
 
 .realized-legend {
-  color: #7dd3fc;
+  color: #8da49a;
 }
 
 .unrealized-legend {
-  color: #fbbf24;
+  color: #a68c91;
+}
+
+.points-legend {
+  color: #c4b5fd;
+}
+
+.legend-point-swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.pnl-sign-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #97a5a8;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.pnl-sign-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pnl-sign-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.profit-swatch {
+  background: #15ff91;
+  box-shadow: 0 0 8px rgba(21, 255, 145, 0.85);
+}
+
+.loss-swatch {
+  background: #ff365f;
+  box-shadow: 0 0 8px rgba(255, 54, 95, 0.85);
 }
 
 .pnl-hover-summary {
@@ -631,22 +708,38 @@ button:not(:disabled):active {
 }
 
 .pnl-hover-summary strong:nth-last-child(2) {
-  color: #7dd3fc;
+  color: #b7c8c0;
 }
 
 .pnl-hover-summary strong:last-child {
-  color: #fbbf24;
+  color: #b9bfc2;
+}
+
+.pnl-chart-viewport {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.pnl-chart-axis {
+  flex: 0 0 58px;
+  width: 58px;
+  height: 172px;
+  overflow: visible;
 }
 
 .pnl-chart-wrap {
-  margin-top: 8px;
-  touch-action: pan-y;
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x pan-y;
   cursor: crosshair;
 }
 
 .pnl-chart-svg {
   display: block;
-  width: 100%;
   height: 172px;
   overflow: visible;
 }
@@ -663,56 +756,124 @@ button:not(:disabled):active {
 }
 
 .pnl-gridline {
-  stroke: rgba(186, 230, 253, 0.1);
+  stroke: rgba(173, 194, 199, 0.09);
   stroke-width: 1;
 }
 
 .pnl-zero-gridline {
-  stroke: rgba(253, 230, 138, 0.58);
-  stroke-width: 1.5;
+  stroke: rgba(167, 188, 192, 0.28);
+  stroke-width: 1;
 }
 
 .pnl-line {
   fill: none;
-  stroke-width: 3;
+  stroke-width: 2.8;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
-.realized-line {
-  stroke: #7dd3fc;
+.pnl-profit-line {
+  stroke: #15ff91;
+  filter: drop-shadow(0 0 4px rgba(21, 255, 145, 0.8)) drop-shadow(0 0 10px rgba(21, 255, 145, 0.32));
 }
 
-.unrealized-line {
-  stroke: #fbbf24;
-  stroke-dasharray: 7 5;
+.pnl-loss-line {
+  stroke: #ff365f;
+  filter: drop-shadow(0 0 4px rgba(255, 54, 95, 0.85)) drop-shadow(0 0 10px rgba(255, 54, 95, 0.32));
+}
+
+.pnl-secondary-line {
+  stroke-width: 2.2;
+  opacity: 0.76;
+}
+
+.pnl-area {
+  stroke: none;
+}
+
+.pnl-area-secondary {
+  opacity: 0.58;
 }
 
 .pnl-hover-line {
-  stroke: rgba(255, 255, 255, 0.38);
+  stroke: rgba(208, 226, 225, 0.44);
   stroke-dasharray: 3 4;
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .pnl-point {
-  stroke: #10223a;
+  stroke: #07100e;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.pnl-profit-point {
+  fill: #15ff91;
+  filter: drop-shadow(0 0 3px rgba(21, 255, 145, 0.9)) drop-shadow(0 0 7px rgba(21, 255, 145, 0.45));
+}
+
+.pnl-loss-point {
+  fill: #ff365f;
+  filter: drop-shadow(0 0 3px rgba(255, 54, 95, 0.95)) drop-shadow(0 0 7px rgba(255, 54, 95, 0.5));
+}
+
+.pnl-hover-point {
+  fill: none;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
-.realized-point {
-  fill: #7dd3fc;
+.pnl-hover-point.pnl-profit-point {
+  stroke: #15ff91;
 }
 
-.unrealized-point {
-  fill: #fbbf24;
+.pnl-hover-point.pnl-loss-point {
+  stroke: #ff365f;
+}
+
+.pnl-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: max-content;
+  max-width: 180px;
+  gap: 4px;
+  padding: 9px 11px;
+  border: 1px solid rgba(112, 145, 145, 0.32);
+  border-radius: 10px;
+  background: rgba(4, 10, 13, 0.94);
+  color: #aab8b8;
+  font-size: 0.65rem;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 9px 25px rgba(0, 0, 0, 0.4), 0 0 16px rgba(21, 255, 145, 0.07);
+  backdrop-filter: blur(8px);
+}
+
+.pnl-chart-tooltip time {
+  color: #8a9b9e;
+  font-size: 0.6rem;
+}
+
+.pnl-chart-tooltip strong {
+  color: #e9f2ee;
+  font-size: 0.71rem;
+}
+
+.pnl-chart-tooltip .profit-value {
+  color: #58ffac;
+}
+
+.pnl-chart-tooltip .loss-value {
+  color: #ff6b85;
 }
 
 .pnl-time-labels {
   display: flex;
   justify-content: space-between;
+  padding: 0 8px;
   color: #7890a8;
   font-size: 0.62rem;
 }
@@ -2142,6 +2303,10 @@ button:not(:disabled):active {
     height: 145px;
   }
 
+  .pnl-chart-axis {
+    height: 145px;
+  }
+
   .share-lookup-panel {
     padding: 16px 14px;
   }
@@ -2948,4 +3113,109 @@ div[class*="netlify"] {
   .apk-download-modal h2 {
     font-size: 1.35rem;
   }
+}
+
+.app-container:not(.login-container) .pnl-panel {
+  border-color: rgba(50, 255, 164, 0.2);
+  background:
+    radial-gradient(ellipse at 82% 0%, rgba(19, 255, 145, 0.055), transparent 38%),
+    linear-gradient(145deg, #0b1115 0%, #070b0e 60%, #090d11 100%);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.38),
+    0 0 24px rgba(19, 255, 145, 0.045),
+    inset 0 1px rgba(255, 255, 255, 0.045);
+  backdrop-filter: none;
+}
+
+.app-container:not(.login-container) .pnl-legend-button.selected.realized-legend {
+  border-color: rgba(21, 255, 145, 0.35);
+  background: rgba(21, 255, 145, 0.07);
+  color: #b7c8c0;
+  box-shadow: none;
+}
+
+.app-container:not(.login-container) .pnl-legend-button.selected.unrealized-legend {
+  border-color: rgba(255, 54, 95, 0.33);
+  background: rgba(255, 54, 95, 0.06);
+  color: #b9bfc2;
+  box-shadow: none;
+}
+
+.app-container:not(.login-container) .realized-legend,
+.app-container:not(.login-container) .pnl-hover-summary strong:nth-last-child(2) {
+  color: #b7c8c0;
+}
+
+.app-container:not(.login-container) .unrealized-legend,
+.app-container:not(.login-container) .pnl-hover-summary strong:last-child {
+  color: #b9bfc2;
+}
+
+.app-container:not(.login-container) .pnl-range-buttons {
+  border-color: rgba(140, 164, 174, 0.16);
+  background: rgba(3, 8, 11, 0.78);
+}
+
+.app-container:not(.login-container) .pnl-range-buttons button {
+  background: transparent;
+  color: #788b91;
+}
+
+.app-container:not(.login-container) .pnl-range-buttons button.active {
+  background: rgba(21, 255, 145, 0.14);
+  color: #8dffc3;
+  box-shadow: inset 0 0 0 1px rgba(21, 255, 145, 0.23), 0 0 12px rgba(21, 255, 145, 0.1);
+}
+
+.app-container:not(.login-container) .pnl-gridline {
+  stroke: rgba(173, 194, 199, 0.09);
+}
+
+.app-container:not(.login-container) .pnl-zero-gridline {
+  stroke: rgba(167, 188, 192, 0.28);
+}
+
+.app-container:not(.login-container) .pnl-hover-line {
+  stroke: rgba(208, 226, 225, 0.44);
+}
+
+.app-container:not(.login-container) .pnl-profit-line {
+  stroke: #15ff91;
+  filter: drop-shadow(0 0 4px rgba(21, 255, 145, 0.8)) drop-shadow(0 0 10px rgba(21, 255, 145, 0.32));
+}
+
+.app-container:not(.login-container) .pnl-loss-line {
+  stroke: #ff365f;
+  filter: drop-shadow(0 0 4px rgba(255, 54, 95, 0.85)) drop-shadow(0 0 10px rgba(255, 54, 95, 0.32));
+}
+
+.app-container:not(.login-container) .pnl-profit-point {
+  fill: #15ff91;
+  filter: drop-shadow(0 0 3px rgba(21, 255, 145, 0.9)) drop-shadow(0 0 7px rgba(21, 255, 145, 0.45));
+}
+
+.app-container:not(.login-container) .pnl-loss-point {
+  fill: #ff365f;
+  filter: drop-shadow(0 0 3px rgba(255, 54, 95, 0.95)) drop-shadow(0 0 7px rgba(255, 54, 95, 0.5));
+}
+
+.app-container:not(.login-container) .pnl-hover-point.pnl-profit-point {
+  stroke: #15ff91;
+}
+
+.app-container:not(.login-container) .pnl-hover-point.pnl-loss-point {
+  stroke: #ff365f;
+}
+
+.app-container:not(.login-container) .pnl-chart-tooltip {
+  border-color: rgba(112, 145, 145, 0.32);
+  background: rgba(4, 10, 13, 0.94);
+}
+
+.app-container:not(.login-container) .pnl-chart-tooltip .profit-value {
+  color: #58ffac;
+}
+
+.app-container:not(.login-container) .pnl-chart-tooltip .loss-value {
+  color: #ff6b85;
 }

@@ -1,7 +1,13 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const INITIAL_CASH = 30000;
+const PNL_CHART_RANGES = {
+  '1H': 60 * 60 * 1000,
+  '1D': 24 * 60 * 60 * 1000,
+  '1W': 7 * 24 * 60 * 60 * 1000,
+  '1M': 30 * 24 * 60 * 60 * 1000,
+};
 
 const getLocalTradesKey = (user) => `tradeNexusTrades:${user}`;
 const getLocalDepositsKey = (user) => `tradeNexusDeposits:${user}`;
@@ -222,6 +228,10 @@ export default function TradeNexusIndia() {
   const [hoveredPnlIndex, setHoveredPnlIndex] = useState(null);
   const [showRealized, setShowRealized] = useState(true);
   const [showUnrealized, setShowUnrealized] = useState(true);
+  const [showPnlPoints, setShowPnlPoints] = useState(true);
+  const [pnlChartRange, setPnlChartRange] = useState('1D');
+  const pnlChartScrollRef = useRef(null);
+  const pnlFollowLatestRef = useRef(true);
 
   useEffect(() => {
     setApkModalOpen(Boolean(user));
@@ -513,34 +523,70 @@ export default function TradeNexusIndia() {
       return [
         ...previous,
         { time: Date.now(), realized: realizedPnL, unrealized: unrealizedPnL },
-      ].slice(-36);
+      ];
     });
   }, [realizedPnL, unrealizedPnL]);
 
+  const pnlRangeStart = Date.now() - PNL_CHART_RANGES[pnlChartRange];
+  const pnlVisibleHistory = pnlHistory.filter((point) => point.time >= pnlRangeStart);
+  const chartHistory =
+    pnlVisibleHistory.length > 0
+      ? pnlVisibleHistory
+      : [pnlHistory[pnlHistory.length - 1]];
   const pnlChart = {
-    width: 720,
+    width: 720 + Math.max(0, chartHistory.length - 12) * 32,
+    initialWidth: 720,
     height: 220,
-    paddingX: 58,
+    paddingX: 8,
     paddingY: 18,
   };
-  const pnlValues = pnlHistory.flatMap((point) => [point.realized, point.unrealized]);
+  const pnlValues = chartHistory.flatMap((point) => [point.realized, point.unrealized]);
   const pnlMagnitude = Math.max(...pnlValues.map(Math.abs), 0);
   const pnlAxisMax = pnlMagnitude > 0 ? pnlMagnitude * 1.15 : 100;
   const pnlAxisMin = -pnlAxisMax;
   const pnlRange = pnlAxisMax - pnlAxisMin;
   const pnlPlotHeight = pnlChart.height - pnlChart.paddingY * 2;
-  const pnlPlotWidth = pnlChart.width - pnlChart.paddingX * 2;
+  const pnlZeroY = pnlChart.paddingY + ((pnlAxisMax - 0) / pnlRange) * pnlPlotHeight;
+  const pnlInitialPlotWidth = pnlChart.initialWidth - pnlChart.paddingX * 2;
+  const getPnlX = (index) =>
+    index < 12
+      ? pnlChart.paddingX +
+        (index / Math.max(Math.min(chartHistory.length, 12) - 1, 1)) *
+          pnlInitialPlotWidth
+      : pnlChart.initialWidth - pnlChart.paddingX + (index - 11) * 32;
   const getPnlY = (value) =>
     pnlChart.paddingY + ((pnlAxisMax - value) / pnlRange) * pnlPlotHeight;
-  const getPnlPoints = (key) =>
-    pnlHistory
-      .map((point, index) => {
-        const x =
-          pnlChart.paddingX +
-          (index / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth;
-        return `${x},${getPnlY(point[key])}`;
-      })
-      .join(' ');
+  const getPnlPath = (key) => {
+    const points = chartHistory.map((point, index) => ({
+      x: getPnlX(index),
+      y: getPnlY(point[key]),
+    }));
+    if (points.length === 0) return '';
+    if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
+
+    return points.reduce((path, point, index) => {
+      if (index === 0) return `M ${point.x},${point.y}`;
+      const previous = points[index - 1];
+      const beforePrevious = points[Math.max(0, index - 2)];
+      const next = points[Math.min(points.length - 1, index + 1)];
+      const controlOne = {
+        x: previous.x + (point.x - beforePrevious.x) / 6,
+        y: previous.y + (point.y - beforePrevious.y) / 6,
+      };
+      const controlTwo = {
+        x: point.x - (next.x - previous.x) / 6,
+        y: point.y - (next.y - previous.y) / 6,
+      };
+      return `${path} C ${controlOne.x},${controlOne.y} ${controlTwo.x},${controlTwo.y} ${point.x},${point.y}`;
+    }, '');
+  };
+  const getPnlAreaPath = (key) => {
+    const linePath = getPnlPath(key);
+    if (!linePath) return '';
+    return `${linePath} L ${getPnlX(chartHistory.length - 1)},${pnlZeroY} L ${getPnlX(0)},${pnlZeroY} Z`;
+  };
+  const hoveredPnlPoint =
+    hoveredPnlIndex === null ? null : chartHistory[hoveredPnlIndex] ?? null;
   const formatPnlAxisValue = (value) =>
     value.toLocaleString('en-IN', {
       style: 'currency',
@@ -548,22 +594,25 @@ export default function TradeNexusIndia() {
       maximumFractionDigits: pnlAxisMax < 100 ? 1 : 0,
     });
 
+  useEffect(() => {
+    const chart = pnlChartScrollRef.current;
+    if (!user || !chart || !pnlFollowLatestRef.current) return;
+    chart.scrollLeft = chart.scrollWidth;
+  }, [chartHistory.length, pnlChartRange, user]);
+
   const handlePnlPointerMove = (event) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const pointerRatio = Math.max(
-      0,
-      Math.min(1, (event.clientX - bounds.left) / bounds.width)
+    const pointerX =
+      event.clientX - bounds.left + event.currentTarget.scrollLeft;
+    const closestIndex = chartHistory.reduce(
+      (closest, _point, index) =>
+        Math.abs(getPnlX(index) - pointerX) <
+        Math.abs(getPnlX(closest) - pointerX)
+          ? index
+          : closest,
+      0
     );
-    const chartRatio = Math.max(
-      0,
-      Math.min(
-        1,
-        (pointerRatio * pnlChart.width - pnlChart.paddingX) / pnlPlotWidth
-      )
-    );
-    setHoveredPnlIndex(
-      Math.round(chartRatio * Math.max(pnlHistory.length - 1, 0))
-    );
+    setHoveredPnlIndex(closestIndex);
   };
 
   const shareSeries = shareDetails?.series || [];
@@ -1006,6 +1055,22 @@ export default function TradeNexusIndia() {
           </div>
 
           <div className="pnl-chart-toolbar">
+            <div className="pnl-range-buttons" role="group" aria-label="P&amp;L chart time range">
+              {Object.keys(PNL_CHART_RANGES).map((range) => (
+                <button
+                  type="button"
+                  key={range}
+                  className={pnlChartRange === range ? 'active' : ''}
+                  aria-pressed={pnlChartRange === range}
+                  onClick={() => {
+                    setPnlChartRange(range);
+                    setHoveredPnlIndex(null);
+                  }}
+                >
+                  {range}
+                </button>
+              ))}
+            </div>
             <div className="pnl-chart-legend" aria-label="Toggle chart lines">
               <button
                 type="button"
@@ -1029,101 +1094,229 @@ export default function TradeNexusIndia() {
                 <span className="legend-swatch" aria-hidden="true" />
                 Unrealized P&amp;L
               </button>
+              <button
+                type="button"
+                className={`pnl-legend-button points-legend ${showPnlPoints ? 'selected' : ''}`}
+                aria-pressed={showPnlPoints}
+                onClick={() => setShowPnlPoints((visible) => !visible)}
+              >
+                <span className="legend-point-swatch" aria-hidden="true" />
+                Points {showPnlPoints ? 'On' : 'Off'}
+              </button>
+            </div>
+            <div className="pnl-sign-legend" aria-label="P&amp;L colors">
+              <span><i className="profit-swatch" /> Profit</span>
+              <span><i className="loss-swatch" /> Loss</span>
             </div>
             <div className="pnl-hover-summary" aria-live="polite">
-              <span>{hoveredPnlIndex === null ? 'Current' : 'Point'} values</span>
-              {hoveredPnlIndex !== null && pnlHistory[hoveredPnlIndex] && (
-                <time>{new Date(pnlHistory[hoveredPnlIndex].time).toLocaleTimeString()}</time>
+              <span>{hoveredPnlPoint ? 'Selected point' : 'Latest update'}</span>
+              {hoveredPnlPoint && (
+                <time>
+                  {new Date(hoveredPnlPoint.time).toLocaleString('en-IN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </time>
               )}
-              <strong>Realized ₹{(pnlHistory[hoveredPnlIndex ?? pnlHistory.length - 1]?.realized ?? realizedPnL).toFixed(0)}</strong>
-              <strong>Unrealized ₹{(pnlHistory[hoveredPnlIndex ?? pnlHistory.length - 1]?.unrealized ?? unrealizedPnL).toFixed(0)}</strong>
+              <strong>
+                Realized ₹{(hoveredPnlPoint?.realized ?? chartHistory[chartHistory.length - 1]?.realized ?? realizedPnL).toFixed(0)}
+              </strong>
+              <strong>
+                Unrealized ₹{(hoveredPnlPoint?.unrealized ?? chartHistory[chartHistory.length - 1]?.unrealized ?? unrealizedPnL).toFixed(0)}
+              </strong>
             </div>
           </div>
 
-          <div
-            className="pnl-chart-wrap"
-            onPointerMove={handlePnlPointerMove}
-            onPointerLeave={() => setHoveredPnlIndex(null)}
-          >
+          <div className="pnl-chart-viewport">
             <svg
-              className="pnl-chart-svg"
-              viewBox={`0 0 ${pnlChart.width} ${pnlChart.height}`}
-              preserveAspectRatio="none"
-              role="img"
-              aria-label="Interactive chart comparing realized and unrealized simulated profit and loss over recent updates"
+              className="pnl-chart-axis"
+              viewBox={`0 0 58 ${pnlChart.height}`}
+              aria-hidden="true"
             >
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                const y = pnlChart.paddingY + ratio * pnlPlotHeight;
                 const value = pnlAxisMax - ratio * pnlRange;
+                const y = pnlChart.paddingY + ratio * pnlPlotHeight;
                 return (
-                  <g key={ratio}>
+                  <text
+                    className="pnl-axis-label"
+                    key={ratio}
+                    x="50"
+                    y={y + 4}
+                    textAnchor="end"
+                  >
+                    {formatPnlAxisValue(value)}
+                  </text>
+                );
+              })}
+            </svg>
+            <div
+              className="pnl-chart-wrap"
+              ref={pnlChartScrollRef}
+              onScroll={(event) => {
+                const chart = event.currentTarget;
+                pnlFollowLatestRef.current =
+                  chart.scrollWidth - chart.clientWidth - chart.scrollLeft <= 40;
+              }}
+              onPointerMove={handlePnlPointerMove}
+              onPointerLeave={() => setHoveredPnlIndex(null)}
+            >
+              <svg
+                className="pnl-chart-svg"
+                width={pnlChart.width}
+                style={{ width: `${pnlChart.width}px` }}
+                viewBox={`0 0 ${pnlChart.width} ${pnlChart.height}`}
+                preserveAspectRatio="none"
+                role="img"
+                aria-label={`Interactive ${pnlChartRange} profit and loss chart`}
+              >
+                <defs>
+                  <linearGradient id="pnl-profit-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#15ff91" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#15ff91" stopOpacity="0.015" />
+                  </linearGradient>
+                  <linearGradient id="pnl-loss-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ff365f" stopOpacity="0.015" />
+                    <stop offset="100%" stopColor="#ff365f" stopOpacity="0.27" />
+                  </linearGradient>
+                  <clipPath id="pnl-profit-clip">
+                    <rect
+                      x="0"
+                      y={pnlChart.paddingY}
+                      width={pnlChart.width}
+                      height={pnlZeroY - pnlChart.paddingY}
+                    />
+                  </clipPath>
+                  <clipPath id="pnl-loss-clip">
+                    <rect
+                      x="0"
+                      y={pnlZeroY}
+                      width={pnlChart.width}
+                      height={pnlChart.height - pnlChart.paddingY - pnlZeroY}
+                    />
+                  </clipPath>
+                </defs>
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                  const y = pnlChart.paddingY + ratio * pnlPlotHeight;
+                  const value = pnlAxisMax - ratio * pnlRange;
+                  return (
                     <line
                       className={Math.abs(value) < pnlAxisMax * 0.001 ? 'pnl-zero-gridline' : 'pnl-gridline'}
-                      x1={pnlChart.paddingX}
-                      x2={pnlChart.width - pnlChart.paddingX}
+                      key={ratio}
+                      x1="0"
+                      x2={pnlChart.width}
                       y1={y}
                       y2={y}
                     />
-                    <text className="pnl-axis-label" x={pnlChart.paddingX - 8} y={y + 4} textAnchor="end">
-                      {formatPnlAxisValue(value)}
-                    </text>
-                  </g>
-                );
-              })}
-              {hoveredPnlIndex !== null && (
+                  );
+                })}
                 <line
-                  className="pnl-hover-line"
-                  x1={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  x2={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  y1={pnlChart.paddingY}
-                  y2={pnlChart.height - pnlChart.paddingY}
+                  className="pnl-zero-gridline"
+                  x1="0"
+                  x2={pnlChart.width}
+                  y1={pnlZeroY}
+                  y2={pnlZeroY}
                 />
+                <g clipPath="url(#pnl-profit-clip)">
+                  {showRealized && (
+                    <path className="pnl-area" d={getPnlAreaPath('realized')} fill="url(#pnl-profit-gradient)" />
+                  )}
+                  {showUnrealized && (
+                    <path className="pnl-area pnl-area-secondary" d={getPnlAreaPath('unrealized')} fill="url(#pnl-profit-gradient)" />
+                  )}
+                  {showRealized && <path className="pnl-line pnl-profit-line" d={getPnlPath('realized')} />}
+                  {showUnrealized && <path className="pnl-line pnl-profit-line pnl-secondary-line" d={getPnlPath('unrealized')} />}
+                </g>
+                <g clipPath="url(#pnl-loss-clip)">
+                  {showRealized && (
+                    <path className="pnl-area" d={getPnlAreaPath('realized')} fill="url(#pnl-loss-gradient)" />
+                  )}
+                  {showUnrealized && (
+                    <path className="pnl-area pnl-area-secondary" d={getPnlAreaPath('unrealized')} fill="url(#pnl-loss-gradient)" />
+                  )}
+                  {showRealized && <path className="pnl-line pnl-loss-line" d={getPnlPath('realized')} />}
+                  {showUnrealized && <path className="pnl-line pnl-loss-line pnl-secondary-line" d={getPnlPath('unrealized')} />}
+                </g>
+                {hoveredPnlIndex !== null && (
+                  <line
+                    className="pnl-hover-line"
+                    x1={getPnlX(hoveredPnlIndex)}
+                    x2={getPnlX(hoveredPnlIndex)}
+                    y1={pnlChart.paddingY}
+                    y2={pnlChart.height - pnlChart.paddingY}
+                  />
+                )}
+                {showPnlPoints && showRealized && chartHistory.map((point, index) => (
+                  <circle
+                    className={`pnl-point ${point.realized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    key={`realized-${point.time}-${index}`}
+                    cx={getPnlX(index)}
+                    cy={getPnlY(point.realized)}
+                    r={index === chartHistory.length - 1 ? '4.5' : '3.2'}
+                  >
+                    <title>
+                      Realized P&amp;L · {new Date(point.time).toLocaleString()} · ₹{point.realized.toFixed(2)}
+                    </title>
+                  </circle>
+                ))}
+                {showPnlPoints && showUnrealized && chartHistory.map((point, index) => (
+                  <circle
+                    className={`pnl-point ${point.unrealized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    key={`unrealized-${point.time}-${index}`}
+                    cx={getPnlX(index)}
+                    cy={getPnlY(point.unrealized)}
+                    r={index === chartHistory.length - 1 ? '4.5' : '3.2'}
+                  >
+                    <title>
+                      Unrealized P&amp;L · {new Date(point.time).toLocaleString()} · ₹{point.unrealized.toFixed(2)}
+                    </title>
+                  </circle>
+                ))}
+                {showPnlPoints && hoveredPnlIndex !== null && showRealized && (
+                  <circle
+                    className={`pnl-hover-point ${hoveredPnlPoint.realized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    cx={getPnlX(hoveredPnlIndex)}
+                    cy={getPnlY(hoveredPnlPoint.realized)}
+                    r="8"
+                  />
+                )}
+                {showPnlPoints && hoveredPnlIndex !== null && showUnrealized && (
+                  <circle
+                    className={`pnl-hover-point ${hoveredPnlPoint.unrealized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    cx={getPnlX(hoveredPnlIndex)}
+                    cy={getPnlY(hoveredPnlPoint.unrealized)}
+                    r="8"
+                  />
+                )}
+              </svg>
+              {hoveredPnlPoint && (
+                <div
+                  className="pnl-chart-tooltip"
+                  style={{
+                    left: Math.max(12, Math.min(getPnlX(hoveredPnlIndex) - 86, pnlChart.width - 188)),
+                    top: Math.max(4, Math.min(getPnlY(hoveredPnlPoint.realized) - 62, pnlChart.height - 120)),
+                  }}
+                  aria-live="polite"
+                >
+                  <time>
+                    {new Date(hoveredPnlPoint.time).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
+                  <strong className={hoveredPnlPoint.realized + hoveredPnlPoint.unrealized < 0 ? 'loss-value' : 'profit-value'}>
+                    Total P&amp;L ₹{(hoveredPnlPoint.realized + hoveredPnlPoint.unrealized).toFixed(2)}
+                  </strong>
+                  <span>Realized ₹{hoveredPnlPoint.realized.toFixed(2)}</span>
+                  <span>Unrealized ₹{hoveredPnlPoint.unrealized.toFixed(2)}</span>
+                </div>
               )}
-              {showRealized && (
-                <polyline className="pnl-line realized-line" points={getPnlPoints('realized')} />
-              )}
-              {showUnrealized && (
-                <polyline className="pnl-line unrealized-line" points={getPnlPoints('unrealized')} />
-              )}
-              {showRealized && (
-                <circle
-                  className="pnl-point realized-point"
-                  cx={pnlChart.width - pnlChart.paddingX}
-                  cy={getPnlY(realizedPnL)}
-                  r="5.5"
-                />
-              )}
-              {showUnrealized && (
-                <circle
-                  className="pnl-point unrealized-point"
-                  cx={pnlChart.width - pnlChart.paddingX}
-                  cy={getPnlY(unrealizedPnL)}
-                  r="3.2"
-                />
-              )}
-              {hoveredPnlIndex !== null && showRealized && (
-                <circle
-                  className="pnl-point realized-point"
-                  cx={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  cy={getPnlY(pnlHistory[hoveredPnlIndex].realized)}
-                  r="5"
-                />
-              )}
-              {hoveredPnlIndex !== null && showUnrealized && (
-                <circle
-                  className="pnl-point unrealized-point"
-                  cx={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  cy={getPnlY(pnlHistory[hoveredPnlIndex].unrealized)}
-                  r="5"
-                />
-              )}
-            </svg>
-            <div className="pnl-time-labels">
-              <span>Earlier updates</span>
-              <span>Latest</span>
+              <div className="pnl-time-labels" style={{ width: pnlChart.width }}>
+                <span>{new Date(chartHistory[0].time).toLocaleDateString('en-IN')}</span>
+                <span>{new Date(chartHistory[chartHistory.length - 1].time).toLocaleDateString('en-IN')}</span>
+              </div>
             </div>
           </div>
-          <p className="pnl-chart-footnote">The chart starts at ₹0 and updates as your trades and positions change. Hover to inspect values; positive values are gains and negative values are losses.</p>
+          <p className="pnl-chart-footnote">Live portfolio P&amp;L across the selected period. Hover over the chart to inspect dated values; gains glow green and losses glow red.</p>
         </section>
 
         <label className="search-panel">
