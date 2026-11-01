@@ -60,6 +60,18 @@ const readLocalTrades = (user) => {
   return trades;
 };
 
+const readJsonResponse = async (response, requestName) => {
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    if (response.status === 404) {
+      throw new Error(`${requestName} endpoint was not found. Redeploy the app with its API routes.`);
+    }
+    throw new Error(`${requestName} returned an invalid response (HTTP ${response.status}).`);
+  }
+};
+
 const isTradeStorageUnconfigured = (response, result) =>
   response.status === 503 && result.error === 'Trade storage is not configured.';
 
@@ -282,7 +294,7 @@ export default function TradeNexusIndia() {
           `/api/trades?userId=${encodeURIComponent(user)}`,
           { signal: controller.signal }
         );
-        let result = await response.json();
+        let result = await readJsonResponse(response, 'Trade history');
         if (isTradeStorageUnconfigured(response, result)) {
           result = readLocalTrades(user);
           setLocalTradeStorage(true);
@@ -911,7 +923,7 @@ export default function TradeNexusIndia() {
           price: stock.price,
         }),
       });
-      let result = await response.json();
+      let result = await readJsonResponse(response, 'Trade save');
       if (isTradeStorageUnconfigured(response, result)) {
         const localTrades = readLocalTrades(user);
         result = {
