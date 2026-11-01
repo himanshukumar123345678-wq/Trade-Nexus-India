@@ -734,8 +734,31 @@ button:not(:disabled):active {
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-color: rgba(229, 169, 60, 0.62) rgba(173, 194, 199, 0.08);
+  scrollbar-width: thin;
   touch-action: pan-x pan-y;
   cursor: crosshair;
+}
+
+.pnl-chart-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.pnl-chart-wrap::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(173, 194, 199, 0.08);
+}
+
+.pnl-chart-wrap::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(229, 169, 60, 0.62);
+  background-clip: padding-box;
+}
+
+.pnl-chart-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 197, 24, 0.82);
+  background-clip: padding-box;
 }
 
 .pnl-chart-svg {
@@ -1672,6 +1695,18 @@ button:not(:disabled):active {
   font-size: 0.69rem;
 }
 
+.trend-chart-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.trend-points-toggle {
+  min-height: 27px;
+  padding: 4px 7px;
+  font-size: 0.62rem;
+}
+
 .chart-caption strong {
   display: inline-flex;
   align-items: center;
@@ -1687,12 +1722,93 @@ button:not(:disabled):active {
   color: #fdba74;
 }
 
+.trend-chart-frame {
+  position: relative;
+  width: 100%;
+  margin-top: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-color: rgba(229, 169, 60, 0.62) rgba(173, 194, 199, 0.08);
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+  cursor: crosshair;
+}
+
+.trend-chart-frame::-webkit-scrollbar {
+  height: 7px;
+}
+
+.trend-chart-frame::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(173, 194, 199, 0.08);
+}
+
+.trend-chart-frame::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(229, 169, 60, 0.62);
+  background-clip: padding-box;
+}
+
+.trend-chart-frame::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 197, 24, 0.82);
+  background-clip: padding-box;
+}
+
+.trend-chart-content {
+  position: relative;
+  min-width: 100%;
+}
+
 .trend-chart {
   display: block;
-  width: 100%;
+  min-width: 100%;
   height: 56px;
-  margin-top: 5px;
   overflow: visible;
+  pointer-events: none;
+}
+
+.trend-chart-axis {
+  position: relative;
+  height: 16px;
+  color: #7890a8;
+  font-size: 0.6rem;
+}
+
+.trend-chart-axis span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.trend-chart-axis span.first-tick {
+  transform: none;
+}
+
+.trend-chart-axis span.last-tick {
+  transform: translateX(-100%);
+}
+
+.market-history-tooltip {
+  top: 3px;
+  width: 160px;
+  max-width: calc(100% - 16px);
+}
+
+.market-history-message {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  margin: 5px 0 0;
+  color: #a9bdd0;
+  font-size: 0.68rem;
+}
+
+.market-history-refresh-error {
+  margin: 4px 0 0;
+  color: #b6a98a;
+  font-size: 0.58rem;
 }
 
 .chart-line {
