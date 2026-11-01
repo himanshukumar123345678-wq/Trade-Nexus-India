@@ -32,6 +32,20 @@ const getDateTicks = (timestamps, showTime = false) => {
   });
 };
 
+const createDemoMarketHistory = (stock, count = 21) => {
+  const now = Math.floor(Date.now() / 1000);
+  return Array.from({ length: count }, (_, index) => {
+    const progress = index / Math.max(count - 1, 1);
+    const movement =
+      Math.sin(index * 0.78 + stock.symbol.length) * 0.018 +
+      Math.sin(index * 0.31 + stock.symbol.length) * 0.009;
+    return {
+      time: now - (count - index - 1) * 24 * 60 * 60,
+      price: Number((stock.price * (1 + movement * progress)).toFixed(2)),
+    };
+  });
+};
+
 const getLocalTradesKey = (user) => `tradeNexusTrades:${user}`;
 const getLocalDepositsKey = (user) => `tradeNexusDeposits:${user}`;
 
@@ -216,6 +230,7 @@ export default function TradeNexusIndia() {
   const [marketHistory, setMarketHistory] = useState({});
   const [showMarketPoints, setShowMarketPoints] = useState({});
   const [marketChartWidths, setMarketChartWidths] = useState({});
+  const [marketChartScrollLeft, setMarketChartScrollLeft] = useState({});
   const marketHistoryChartRefs = useRef({});
   const marketHistoryFollowLatest = useRef({});
   const lastMarketHistoryTime = useRef({});
@@ -357,6 +372,7 @@ export default function TradeNexusIndia() {
           {
             points: previous[stock.symbol]?.points || [],
             status: previous[stock.symbol]?.points?.length ? 'ready' : 'loading',
+            source: previous[stock.symbol]?.source || null,
             error: null,
           },
         ])
@@ -364,72 +380,77 @@ export default function TradeNexusIndia() {
     );
 
     const refreshMarketHistory = async () => {
-      await Promise.all(
-        initialStocks.map(async (stock) => {
-          try {
-            const response = await fetch(
-              `/api/yahoo/chart/${encodeURIComponent(`${stock.symbol}.NS`)}?range=1mo&interval=1d`,
-              { signal: controller.signal }
-            );
-            if (!response.ok) {
-              throw new Error(`Market history request failed (${response.status})`);
-            }
+      for (const stock of initialStocks) {
+        if (controller.signal.aborted) return;
 
-            const data = await response.json();
-            const result = data.chart?.result?.[0];
-            if (!result) {
-              throw new Error(data.chart?.error?.description || 'No market history was returned.');
-            }
-
-            const closes = result.indicators?.quote?.[0]?.close || [];
-            const historyPoints = (result.timestamp || [])
-              .map((time, index) => ({ time, price: closes[index] }))
-              .filter((point) => Number.isFinite(point.price));
-            if (historyPoints.length < 8) {
-              throw new Error('At least 8 historical prices are required to draw this chart.');
-            }
-
-            const quoteTime = result.meta?.regularMarketTime;
-            const quotePrice = result.meta?.regularMarketPrice;
-            const points =
-              Number.isFinite(quoteTime) && Number.isFinite(quotePrice)
-                ? [...historyPoints, { time: quoteTime, price: quotePrice }]
-                : historyPoints;
-
-            if (!controller.signal.aborted) {
-              setMarketHistory((previous) => {
-                const existing = previous[stock.symbol]?.points || [];
-                const mergedPoints = new Map(
-                  existing.map((point) => [point.time, point])
-                );
-                points.forEach((point) => mergedPoints.set(point.time, point));
-                return {
-                  ...previous,
-                  [stock.symbol]: {
-                    points: [...mergedPoints.values()].sort((first, second) => first.time - second.time),
-                    status: 'ready',
-                    error: null,
-                  },
-                };
-              });
-            }
-          } catch (error) {
-            if (!controller.signal.aborted && error.name !== 'AbortError') {
-              setMarketHistory((previous) => {
-                const existing = previous[stock.symbol]?.points || [];
-                return {
-                  ...previous,
-                  [stock.symbol]: {
-                    points: existing,
-                    status: existing.length ? 'ready' : 'error',
-                    error: error.message || 'Could not load market history.',
-                  },
-                };
-              });
-            }
+        try {
+          const response = await fetch(
+            `/api/yahoo/chart/${encodeURIComponent(`${stock.symbol}.NS`)}?range=1mo&interval=1d`,
+            { signal: controller.signal }
+          );
+          if (!response.ok) {
+            throw new Error(`Market history request failed (${response.status})`);
           }
-        })
-      );
+
+          const data = await response.json();
+          const result = data.chart?.result?.[0];
+          if (!result) {
+            throw new Error(data.chart?.error?.description || 'No market history was returned.');
+          }
+
+          const closes = result.indicators?.quote?.[0]?.close || [];
+          const historyPoints = (result.timestamp || [])
+            .map((time, index) => ({ time, price: closes[index] }))
+            .filter((point) => Number.isFinite(point.price));
+          if (historyPoints.length < 8) {
+            throw new Error('At least 8 historical prices are required to draw this chart.');
+          }
+
+          const quoteTime = result.meta?.regularMarketTime;
+          const quotePrice = result.meta?.regularMarketPrice;
+          const points =
+            Number.isFinite(quoteTime) && Number.isFinite(quotePrice)
+              ? [...historyPoints, { time: quoteTime, price: quotePrice }]
+              : historyPoints;
+
+          if (!controller.signal.aborted) {
+            setMarketHistory((previous) => {
+              const existing = previous[stock.symbol]?.points || [];
+              const mergedPoints = new Map(
+                existing.map((point) => [point.time, point])
+              );
+              points.forEach((point) => mergedPoints.set(point.time, point));
+              return {
+                ...previous,
+                [stock.symbol]: {
+                  points: [...mergedPoints.values()].sort((first, second) => first.time - second.time),
+                  status: 'ready',
+                  source: 'market',
+                  error: null,
+                },
+              };
+            });
+          }
+        } catch (error) {
+          if (!controller.signal.aborted && error.name !== 'AbortError') {
+            setMarketHistory((previous) => {
+              const existing = previous[stock.symbol]?.points || [];
+              const hasMarketHistory = existing.length > 0;
+              return {
+                ...previous,
+                [stock.symbol]: {
+                  points: hasMarketHistory ? existing : createDemoMarketHistory(stock),
+                  status: 'ready',
+                  source: hasMarketHistory
+                    ? previous[stock.symbol]?.source || 'market'
+                    : 'simulated',
+                  error: error.message || 'Could not load market history.',
+                },
+              };
+            });
+          }
+        }
+      }
     };
 
     refreshMarketHistory();
@@ -439,6 +460,39 @@ export default function TradeNexusIndia() {
       window.clearInterval(refreshTimer);
       controller.abort();
     };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const timer = window.setInterval(() => {
+      const time = Math.floor(Date.now() / 1000);
+      setMarketHistory((previous) =>
+        Object.fromEntries(
+          Object.entries(previous).map(([symbol, history]) => {
+            if (history.status !== 'ready' || history.points.length === 0) {
+              return [symbol, history];
+            }
+
+            const lastPoint = history.points[history.points.length - 1];
+            if (time <= lastPoint.time) return [symbol, history];
+
+            const movement = (Math.random() - 0.5) * 0.0012;
+            const nextPrice = Number((lastPoint.price * (1 + movement)).toFixed(2));
+            return [
+              symbol,
+              {
+                ...history,
+                points: [...history.points, { time, price: nextPrice }],
+                source: history.source === 'simulated' ? 'simulated' : 'live-demo',
+              },
+            ];
+          })
+        )
+      );
+    }, 10 * 1000);
+
+    return () => window.clearInterval(timer);
   }, [user]);
 
   useEffect(() => {
@@ -1976,12 +2030,27 @@ export default function TradeNexusIndia() {
                 chartInset * 2 + Math.max(historyPoints.length - 1, 0) * pointSpacing
               );
               const getMarketHistoryX = (index) => chartInset + index * pointSpacing;
-              const historyPrices = historyPoints.map((point) => point.price);
-              const historyMin = Math.min(...historyPrices, firstPrice ?? Infinity);
-              const historyMax = Math.max(...historyPrices, firstPrice ?? -Infinity);
-              const historyRange = historyMax - historyMin || historyMax * 0.01 || 1;
-              const chartMin = historyMin - historyRange * 0.12;
-              const chartMax = historyMax + historyRange * 0.12;
+              const chartScrollLeft = marketChartScrollLeft[stock.symbol] || 0;
+              const firstVisibleIndex = Math.min(
+                historyPoints.length - 1,
+                Math.max(0, Math.floor((chartScrollLeft - chartInset) / pointSpacing))
+              );
+              const lastVisibleIndex = Math.max(
+                firstVisibleIndex + 1,
+                Math.min(
+                  historyPoints.length,
+                  Math.ceil((chartScrollLeft + chartViewportWidth - chartInset) / pointSpacing) + 1
+                )
+              );
+              const visiblePrices = historyPoints
+                .slice(firstVisibleIndex, lastVisibleIndex)
+                .map((point) => point.price);
+              const visibleMin = Math.min(...visiblePrices);
+              const visibleMax = Math.max(...visiblePrices);
+              const visibleRange =
+                visibleMax - visibleMin || Math.max(Math.abs(visibleMax) * 0.002, 0.01);
+              const chartMin = visibleMin - visibleRange * 0.12;
+              const chartMax = visibleMax + visibleRange * 0.12;
               const chartValueRange = chartMax - chartMin || 1;
               const getMarketHistoryY = (price) =>
                 chartHeight - ((price - chartMin) / chartValueRange) * (chartHeight - 10) - 5;
@@ -1991,7 +2060,10 @@ export default function TradeNexusIndia() {
                 return `${x},${y}`;
               });
               const chartLine = chartPoints.join(' ');
-              const baselineY = getMarketHistoryY(firstPrice ?? historyMin);
+              const baselineY = Math.max(
+                5,
+                Math.min(chartHeight - 5, getMarketHistoryY(firstPrice ?? visibleMin))
+              );
               const lastChartX = getMarketHistoryX(Math.max(historyPoints.length - 1, 0));
               const chartArea = `M ${chartInset},${baselineY} L ${chartLine} L ${lastChartX},${baselineY} Z`;
               const showPoints = showMarketPoints[stock.symbol] ?? true;
@@ -2019,7 +2091,14 @@ export default function TradeNexusIndia() {
 
                   <div className={`price-chart ${trendUp ? 'trend-up' : 'trend-down'}`}>
                     <div className="chart-caption">
-                      <span>1-month market trend</span>
+                      <span>
+                        1-month market trend
+                        {history?.source === 'simulated'
+                          ? ' · simulated'
+                          : history?.source === 'live-demo'
+                            ? ' · live demo'
+                            : ''}
+                      </span>
                       <div className="trend-chart-controls">
                         {history?.status === 'ready' && (
                           <strong>
@@ -2062,6 +2141,12 @@ export default function TradeNexusIndia() {
                           }}
                           onScroll={(event) => {
                             const chart = event.currentTarget;
+                            const scrollLeft = Math.round(chart.scrollLeft);
+                            setMarketChartScrollLeft((previous) =>
+                              previous[stock.symbol] === scrollLeft
+                                ? previous
+                                : { ...previous, [stock.symbol]: scrollLeft }
+                            );
                             marketHistoryFollowLatest.current[stock.symbol] =
                               chart.scrollWidth - chart.clientWidth - chart.scrollLeft <= 24;
                           }}
@@ -2220,7 +2305,9 @@ export default function TradeNexusIndia() {
                         </div>
                         {history?.error && (
                           <p className="market-history-refresh-error" role="status">
-                            Latest history refresh failed; showing previously loaded data.
+                            {history.source === 'simulated'
+                              ? 'Market feed unavailable; showing a simulated trend.'
+                              : 'Market refresh unavailable; showing previously loaded data.'}
                           </p>
                         )}
                       </>
