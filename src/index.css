@@ -29,6 +29,10 @@ body {
   min-height: 100vh;
 }
 
+body.android-app .get-android-app-btn {
+  display: none !important;
+}
+
 button,
 input {
   font: inherit;

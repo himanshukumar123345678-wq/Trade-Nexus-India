@@ -279,6 +279,13 @@ export default function TradeNexusIndia() {
   const pnlFollowLatestRef = useRef(true);
 
   useEffect(() => {
+    const isAndroidApp = navigator.userAgent.includes('AndroidApp');
+    document.body.classList.toggle('android-app', isAndroidApp);
+
+    return () => document.body.classList.remove('android-app');
+  }, []);
+
+  useEffect(() => {
     setApkModalOpen(Boolean(user));
   }, [user]);
 
@@ -1217,7 +1224,7 @@ export default function TradeNexusIndia() {
 
           <div className="app-header-actions">
             <button
-              className="dashboard-download-trigger"
+              className="dashboard-download-trigger get-android-app-btn"
               type="button"
               onClick={() => setApkModalOpen(true)}
             >
