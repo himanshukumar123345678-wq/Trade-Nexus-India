@@ -3,8 +3,9 @@
   "short_name": "TradeNexus",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#080b12",
-  "theme_color": "#080b12",
+  "background_color": "#0B0F14",
+  "theme_color": "#00E676",
+  "description": "TradeNexus India - Smart Market Dashboard",
   "icons": [
     {
       "src": "/icons/icon-192.png",
