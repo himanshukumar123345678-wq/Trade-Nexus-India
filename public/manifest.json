@@ -2,12 +2,16 @@
   "id": "/",
   "name": "TradeNexus India",
   "short_name": "TradeNexus",
-  "start_url": "/",
-  "display": "standalone",
+  "start_url": "https://trade-nexus-india.vercel.app/",
+  "display": "fullscreen",
   "background_color": "#0B0F14",
   "theme_color": "#00E676",
   "description": "TradeNexus India - Smart Market Dashboard",
-  "categories": ["finance", "dashboard", "utilities"],
+  "categories": [
+    "finance",
+    "dashboard",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -21,5 +25,15 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "dir": "auto",
+  "lang": "en",
+  "orientation": "any",
+  "display_override": [
+    "fullscreen",
+    "minimal-ui",
+    "standalone",
+    "browser",
+    "window-controls-overlay"
   ]
 }
