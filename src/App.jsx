@@ -48,6 +48,7 @@ const createDemoMarketHistory = (stock, count = 21) => {
 
 const getLocalTradesKey = (user) => `tradeNexusTrades:${user}`;
 const getLocalDepositsKey = (user) => `tradeNexusDeposits:${user}`;
+const APK_PROMPT_HIDDEN_KEY = 'tradeNexusApkPromptHidden';
 
 const readLocalDeposits = (user) => {
   const storedDeposits = localStorage.getItem(getLocalDepositsKey(user));
@@ -223,6 +224,11 @@ export default function TradeNexusIndia() {
     localStorage.getItem('tradeNexusUser')
   );
   const [apkModalOpen, setApkModalOpen] = useState(false);
+  const [apkPromptHidden, setApkPromptHidden] = useState(
+    () =>
+      localStorage.getItem(APK_PROMPT_HIDDEN_KEY) === 'true' ||
+      navigator.userAgent.includes('AndroidApp')
+  );
   const [loginMethod, setLoginMethod] = useState('email');
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -282,12 +288,17 @@ export default function TradeNexusIndia() {
     const isAndroidApp = navigator.userAgent.includes('AndroidApp');
     document.body.classList.toggle('android-app', isAndroidApp);
 
+    if (isAndroidApp) {
+      localStorage.setItem(APK_PROMPT_HIDDEN_KEY, 'true');
+      setApkPromptHidden(true);
+    }
+
     return () => document.body.classList.remove('android-app');
   }, []);
 
   useEffect(() => {
-    setApkModalOpen(Boolean(user));
-  }, [user]);
+    setApkModalOpen(Boolean(user) && !apkPromptHidden);
+  }, [user, apkPromptHidden]);
 
   useEffect(() => {
     if (!apkModalOpen) return undefined;
@@ -1223,13 +1234,15 @@ export default function TradeNexusIndia() {
           </div>
 
           <div className="app-header-actions">
-            <button
-              className="dashboard-download-trigger get-android-app-btn"
-              type="button"
-              onClick={() => setApkModalOpen(true)}
-            >
-              Get Android app
-            </button>
+            {!apkPromptHidden && (
+              <button
+                className="dashboard-download-trigger get-android-app-btn"
+                type="button"
+                onClick={() => setApkModalOpen(true)}
+              >
+                Get Android app
+              </button>
+            )}
             <button
               className="logout-button"
               onClick={() => {
