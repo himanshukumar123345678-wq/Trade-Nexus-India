@@ -1,10 +1,54 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const INITIAL_CASH = 30000;
+const PNL_CHART_RANGES = {
+  '1H': 60 * 60 * 1000,
+  '1D': 24 * 60 * 60 * 1000,
+  '1W': 7 * 24 * 60 * 60 * 1000,
+  '1M': 30 * 24 * 60 * 60 * 1000,
+  ALL: null,
+};
+
+const getDateTicks = (timestamps, showTime = false) => {
+  const lastIndex = timestamps.length - 1;
+  const indices = [...new Set([0, Math.floor(lastIndex / 2), lastIndex])];
+
+  return indices.map((index) => {
+    const date = new Date(timestamps[index]);
+    return {
+      index,
+      label: showTime
+        ? date.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })
+        : date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+          }),
+    };
+  });
+};
+
+const createDemoMarketHistory = (stock, count = 21) => {
+  const now = Math.floor(Date.now() / 1000);
+  return Array.from({ length: count }, (_, index) => {
+    const progress = index / Math.max(count - 1, 1);
+    const movement =
+      Math.sin(index * 0.78 + stock.symbol.length) * 0.018 +
+      Math.sin(index * 0.31 + stock.symbol.length) * 0.009;
+    return {
+      time: now - (count - index - 1) * 24 * 60 * 60,
+      price: Number((stock.price * (1 + movement * progress)).toFixed(2)),
+    };
+  });
+};
 
 const getLocalTradesKey = (user) => `tradeNexusTrades:${user}`;
 const getLocalDepositsKey = (user) => `tradeNexusDeposits:${user}`;
+const APK_PROMPT_HIDDEN_KEY = 'tradeNexusApkPromptHidden';
 
 const readLocalDeposits = (user) => {
   const storedDeposits = localStorage.getItem(getLocalDepositsKey(user));
@@ -29,6 +73,18 @@ const readLocalTrades = (user) => {
     throw new Error('Saved trade data is invalid. Clear this browser’s trade data to continue.');
   }
   return trades;
+};
+
+const readJsonResponse = async (response, requestName) => {
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    if (response.status === 404) {
+      throw new Error(`${requestName} endpoint was not found. Redeploy the app with its API routes.`);
+    }
+    throw new Error(`${requestName} returned an invalid response (HTTP ${response.status}).`);
+  }
 };
 
 const isTradeStorageUnconfigured = (response, result) =>
@@ -167,22 +223,23 @@ export default function TradeNexusIndia() {
   const [user, setUser] = useState(() =>
     localStorage.getItem('tradeNexusUser')
   );
+  const [apkModalOpen, setApkModalOpen] = useState(false);
+  const [apkPromptHidden, setApkPromptHidden] = useState(
+    () =>
+      localStorage.getItem(APK_PROMPT_HIDDEN_KEY) === 'true' ||
+      navigator.userAgent.includes('AndroidApp')
+  );
   const [loginMethod, setLoginMethod] = useState('email');
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [stocks, setStocks] = useState(initialStocks);
-  const [priceHistory, setPriceHistory] = useState(() =>
-    Object.fromEntries(
-      initialStocks.map((stock, stockIndex) => [
-        stock.symbol,
-        Array.from({ length: 20 }, (_, pointIndex) => {
-          const progress = pointIndex / 19;
-          const wave = Math.sin(pointIndex * 0.8 + stockIndex) * 0.003;
-          return Number((stock.price * (1 + wave * (1 - progress))).toFixed(2));
-        }),
-      ])
-    )
-  );
+  const [marketHistory, setMarketHistory] = useState({});
+  const [showMarketPoints, setShowMarketPoints] = useState({});
+  const [marketChartWidths, setMarketChartWidths] = useState({});
+  const [marketChartScrollLeft, setMarketChartScrollLeft] = useState({});
+  const marketHistoryChartRefs = useRef({});
+  const marketHistoryFollowLatest = useRef({});
+  const lastMarketHistoryTime = useRef({});
   const [search, setSearch] = useState('');
   const normalizedSearch = search.trim();
   const [shareSearchResults, setShareSearchResults] = useState([]);
@@ -197,6 +254,7 @@ export default function TradeNexusIndia() {
   const [shareChartHoverIndex, setShareChartHoverIndex] = useState(null);
   const [showMovingAverage, setShowMovingAverage] = useState(false);
   const [showRsi, setShowRsi] = useState(false);
+  const [hoveredMarketHistory, setHoveredMarketHistory] = useState({});
   const [cash, setCash] = useState(INITIAL_CASH);
   const [holdings, setHoldings] = useState({});
   const [orders, setOrders] = useState([]);
@@ -221,6 +279,37 @@ export default function TradeNexusIndia() {
   const [hoveredPnlIndex, setHoveredPnlIndex] = useState(null);
   const [showRealized, setShowRealized] = useState(true);
   const [showUnrealized, setShowUnrealized] = useState(true);
+  const [showPnlPoints, setShowPnlPoints] = useState(true);
+  const [pnlChartRange, setPnlChartRange] = useState('1D');
+  const pnlChartScrollRef = useRef(null);
+  const pnlFollowLatestRef = useRef(true);
+
+  useEffect(() => {
+    const isAndroidApp = navigator.userAgent.includes('AndroidApp');
+    document.body.classList.toggle('android-app', isAndroidApp);
+
+    if (isAndroidApp) {
+      localStorage.setItem(APK_PROMPT_HIDDEN_KEY, 'true');
+      setApkPromptHidden(true);
+    }
+
+    return () => document.body.classList.remove('android-app');
+  }, []);
+
+  useEffect(() => {
+    setApkModalOpen(Boolean(user) && !apkPromptHidden);
+  }, [user, apkPromptHidden]);
+
+  useEffect(() => {
+    if (!apkModalOpen) return undefined;
+
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setApkModalOpen(false);
+    };
+
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [apkModalOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -238,7 +327,7 @@ export default function TradeNexusIndia() {
           `/api/trades?userId=${encodeURIComponent(user)}`,
           { signal: controller.signal }
         );
-        let result = await response.json();
+        let result = await readJsonResponse(response, 'Trade history');
         if (isTradeStorageUnconfigured(response, result)) {
           result = readLocalTrades(user);
           setLocalTradeStorage(true);
@@ -286,15 +375,186 @@ export default function TradeNexusIndia() {
   }, []);
 
   useEffect(() => {
-    setPriceHistory((previous) =>
+    if (!user) {
+      setMarketHistory({});
+      marketHistoryFollowLatest.current = {};
+      lastMarketHistoryTime.current = {};
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setMarketHistory((previous) =>
       Object.fromEntries(
-        stocks.map((stock) => [
+        initialStocks.map((stock) => [
           stock.symbol,
-          [...(previous[stock.symbol] || []), stock.price].slice(-24),
+          {
+            points: previous[stock.symbol]?.points || [],
+            status: previous[stock.symbol]?.points?.length ? 'ready' : 'loading',
+            source: previous[stock.symbol]?.source || null,
+            error: null,
+          },
         ])
       )
     );
-  }, [stocks]);
+
+    const refreshMarketHistory = async () => {
+      for (const stock of initialStocks) {
+        if (controller.signal.aborted) return;
+
+        try {
+          const response = await fetch(
+            `/api/yahoo/chart/${encodeURIComponent(`${stock.symbol}.NS`)}?range=1mo&interval=1d`,
+            { signal: controller.signal }
+          );
+          if (!response.ok) {
+            throw new Error(`Market history request failed (${response.status})`);
+          }
+
+          const data = await response.json();
+          const result = data.chart?.result?.[0];
+          if (!result) {
+            throw new Error(data.chart?.error?.description || 'No market history was returned.');
+          }
+
+          const closes = result.indicators?.quote?.[0]?.close || [];
+          const historyPoints = (result.timestamp || [])
+            .map((time, index) => ({ time, price: closes[index] }))
+            .filter((point) => Number.isFinite(point.price));
+          if (historyPoints.length < 8) {
+            throw new Error('At least 8 historical prices are required to draw this chart.');
+          }
+
+          const quoteTime = result.meta?.regularMarketTime;
+          const quotePrice = result.meta?.regularMarketPrice;
+          const points =
+            Number.isFinite(quoteTime) && Number.isFinite(quotePrice)
+              ? [...historyPoints, { time: quoteTime, price: quotePrice }]
+              : historyPoints;
+
+          if (!controller.signal.aborted) {
+            setMarketHistory((previous) => {
+              const existing = previous[stock.symbol]?.points || [];
+              const mergedPoints = new Map(
+                existing.map((point) => [point.time, point])
+              );
+              points.forEach((point) => mergedPoints.set(point.time, point));
+              return {
+                ...previous,
+                [stock.symbol]: {
+                  points: [...mergedPoints.values()].sort((first, second) => first.time - second.time),
+                  status: 'ready',
+                  source: 'market',
+                  error: null,
+                },
+              };
+            });
+          }
+        } catch (error) {
+          if (!controller.signal.aborted && error.name !== 'AbortError') {
+            setMarketHistory((previous) => {
+              const existing = previous[stock.symbol]?.points || [];
+              const hasMarketHistory = existing.length > 0;
+              return {
+                ...previous,
+                [stock.symbol]: {
+                  points: hasMarketHistory ? existing : createDemoMarketHistory(stock),
+                  status: 'ready',
+                  source: hasMarketHistory
+                    ? previous[stock.symbol]?.source || 'market'
+                    : 'simulated',
+                  error: error.message || 'Could not load market history.',
+                },
+              };
+            });
+          }
+        }
+      }
+    };
+
+    refreshMarketHistory();
+    const refreshTimer = window.setInterval(refreshMarketHistory, 5 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(refreshTimer);
+      controller.abort();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const timer = window.setInterval(() => {
+      const time = Math.floor(Date.now() / 1000);
+      setMarketHistory((previous) =>
+        Object.fromEntries(
+          Object.entries(previous).map(([symbol, history]) => {
+            if (history.status !== 'ready' || history.points.length === 0) {
+              return [symbol, history];
+            }
+
+            const lastPoint = history.points[history.points.length - 1];
+            if (time <= lastPoint.time) return [symbol, history];
+
+            const movement = (Math.random() - 0.5) * 0.0012;
+            const nextPrice = Number((lastPoint.price * (1 + movement)).toFixed(2));
+            return [
+              symbol,
+              {
+                ...history,
+                points: [...history.points, { time, price: nextPrice }],
+                source: history.source === 'simulated' ? 'simulated' : 'live-demo',
+              },
+            ];
+          })
+        )
+      );
+    }, 10 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [user]);
+
+  useEffect(() => {
+    Object.entries(marketHistory).forEach(([symbol, history]) => {
+      const lastPoint = history.points[history.points.length - 1];
+      if (!lastPoint || lastMarketHistoryTime.current[symbol] === lastPoint.time) return;
+
+      const chart = marketHistoryChartRefs.current[symbol];
+      const wasFollowingLatest =
+        lastMarketHistoryTime.current[symbol] === undefined ||
+        marketHistoryFollowLatest.current[symbol] !== false;
+      lastMarketHistoryTime.current[symbol] = lastPoint.time;
+
+      if (chart && wasFollowingLatest) {
+        chart.scrollLeft = chart.scrollWidth;
+      }
+    });
+  }, [marketHistory]);
+
+  useEffect(() => {
+    if (!user || typeof ResizeObserver === 'undefined') return undefined;
+
+    const observer = new ResizeObserver((entries) => {
+      setMarketChartWidths((previous) => {
+        let changed = false;
+        const next = { ...previous };
+        entries.forEach(({ target }) => {
+          const symbol = target.dataset.marketSymbol;
+          const width = Math.floor(target.clientWidth);
+          if (symbol && width > 0 && next[symbol] !== width) {
+            next[symbol] = width;
+            changed = true;
+          }
+        });
+        return changed ? next : previous;
+      });
+    });
+
+    Object.values(marketHistoryChartRefs.current).forEach((chart) => {
+      if (chart) observer.observe(chart);
+    });
+
+    return () => observer.disconnect();
+  }, [marketHistory, user]);
 
   useEffect(() => {
     const query = normalizedSearch;
@@ -497,34 +757,77 @@ export default function TradeNexusIndia() {
       return [
         ...previous,
         { time: Date.now(), realized: realizedPnL, unrealized: unrealizedPnL },
-      ].slice(-36);
+      ];
     });
   }, [realizedPnL, unrealizedPnL]);
 
+  const pnlRangeDuration = PNL_CHART_RANGES[pnlChartRange];
+  const pnlVisibleHistory =
+    pnlRangeDuration === null
+      ? pnlHistory
+      : pnlHistory.filter((point) => point.time >= Date.now() - pnlRangeDuration);
+  const chartHistory =
+    pnlVisibleHistory.length > 0
+      ? pnlVisibleHistory
+      : [pnlHistory[pnlHistory.length - 1]];
   const pnlChart = {
-    width: 720,
+    width: 720 + Math.max(0, chartHistory.length - 12) * 32,
+    initialWidth: 720,
     height: 220,
-    paddingX: 58,
+    paddingX: 8,
     paddingY: 18,
   };
-  const pnlValues = pnlHistory.flatMap((point) => [point.realized, point.unrealized]);
+  const pnlValues = chartHistory.flatMap((point) => [point.realized, point.unrealized]);
   const pnlMagnitude = Math.max(...pnlValues.map(Math.abs), 0);
   const pnlAxisMax = pnlMagnitude > 0 ? pnlMagnitude * 1.15 : 100;
   const pnlAxisMin = -pnlAxisMax;
   const pnlRange = pnlAxisMax - pnlAxisMin;
   const pnlPlotHeight = pnlChart.height - pnlChart.paddingY * 2;
-  const pnlPlotWidth = pnlChart.width - pnlChart.paddingX * 2;
+  const pnlZeroY = pnlChart.paddingY + ((pnlAxisMax - 0) / pnlRange) * pnlPlotHeight;
+  const pnlInitialPlotWidth = pnlChart.initialWidth - pnlChart.paddingX * 2;
+  const getPnlX = (index) =>
+    index < 12
+      ? pnlChart.paddingX +
+        (index / Math.max(Math.min(chartHistory.length, 12) - 1, 1)) *
+          pnlInitialPlotWidth
+      : pnlChart.initialWidth - pnlChart.paddingX + (index - 11) * 32;
   const getPnlY = (value) =>
     pnlChart.paddingY + ((pnlAxisMax - value) / pnlRange) * pnlPlotHeight;
-  const getPnlPoints = (key) =>
-    pnlHistory
-      .map((point, index) => {
-        const x =
-          pnlChart.paddingX +
-          (index / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth;
-        return `${x},${getPnlY(point[key])}`;
-      })
-      .join(' ');
+  const getPnlPath = (key) => {
+    const points = chartHistory.map((point, index) => ({
+      x: getPnlX(index),
+      y: getPnlY(point[key]),
+    }));
+    if (points.length === 0) return '';
+    if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
+
+    return points.reduce((path, point, index) => {
+      if (index === 0) return `M ${point.x},${point.y}`;
+      const previous = points[index - 1];
+      const beforePrevious = points[Math.max(0, index - 2)];
+      const next = points[Math.min(points.length - 1, index + 1)];
+      const controlOne = {
+        x: previous.x + (point.x - beforePrevious.x) / 6,
+        y: previous.y + (point.y - beforePrevious.y) / 6,
+      };
+      const controlTwo = {
+        x: point.x - (next.x - previous.x) / 6,
+        y: point.y - (next.y - previous.y) / 6,
+      };
+      return `${path} C ${controlOne.x},${controlOne.y} ${controlTwo.x},${controlTwo.y} ${point.x},${point.y}`;
+    }, '');
+  };
+  const getPnlAreaPath = (key) => {
+    const linePath = getPnlPath(key);
+    if (!linePath) return '';
+    return `${linePath} L ${getPnlX(chartHistory.length - 1)},${pnlZeroY} L ${getPnlX(0)},${pnlZeroY} Z`;
+  };
+  const hoveredPnlPoint =
+    hoveredPnlIndex === null ? null : chartHistory[hoveredPnlIndex] ?? null;
+  const pnlDateTicks = getDateTicks(
+    chartHistory.map((point) => point.time),
+    pnlChartRange === '1H' || pnlChartRange === '1D'
+  );
   const formatPnlAxisValue = (value) =>
     value.toLocaleString('en-IN', {
       style: 'currency',
@@ -532,22 +835,25 @@ export default function TradeNexusIndia() {
       maximumFractionDigits: pnlAxisMax < 100 ? 1 : 0,
     });
 
+  useEffect(() => {
+    const chart = pnlChartScrollRef.current;
+    if (!user || !chart || !pnlFollowLatestRef.current) return;
+    chart.scrollLeft = chart.scrollWidth;
+  }, [chartHistory.length, pnlChartRange, user]);
+
   const handlePnlPointerMove = (event) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const pointerRatio = Math.max(
-      0,
-      Math.min(1, (event.clientX - bounds.left) / bounds.width)
+    const pointerX =
+      event.clientX - bounds.left + event.currentTarget.scrollLeft;
+    const closestIndex = chartHistory.reduce(
+      (closest, _point, index) =>
+        Math.abs(getPnlX(index) - pointerX) <
+        Math.abs(getPnlX(closest) - pointerX)
+          ? index
+          : closest,
+      0
     );
-    const chartRatio = Math.max(
-      0,
-      Math.min(
-        1,
-        (pointerRatio * pnlChart.width - pnlChart.paddingX) / pnlPlotWidth
-      )
-    );
-    setHoveredPnlIndex(
-      Math.round(chartRatio * Math.max(pnlHistory.length - 1, 0))
-    );
+    setHoveredPnlIndex(closestIndex);
   };
 
   const shareSeries = shareDetails?.series || [];
@@ -689,7 +995,7 @@ export default function TradeNexusIndia() {
           price: stock.price,
         }),
       });
-      let result = await response.json();
+      let result = await readJsonResponse(response, 'Trade save');
       if (isTradeStorageUnconfigured(response, result)) {
         const localTrades = readLocalTrades(user);
         result = {
@@ -927,15 +1233,26 @@ export default function TradeNexusIndia() {
             <p className="header-subtitle">Your market, at a glance</p>
           </div>
 
-          <button
-            className="logout-button"
-            onClick={() => {
-              localStorage.removeItem('tradeNexusUser');
-              setUser(null);
-            }}
-          >
-            Logout
-          </button>
+          <div className="app-header-actions">
+            {!apkPromptHidden && (
+              <button
+                className="dashboard-download-trigger get-android-app-btn"
+                type="button"
+                onClick={() => setApkModalOpen(true)}
+              >
+                Get Android app
+              </button>
+            )}
+            <button
+              className="logout-button"
+              onClick={() => {
+                localStorage.removeItem('tradeNexusUser');
+                setUser(null);
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </header>
 
         <section className="metrics-grid" aria-label="Portfolio summary">
@@ -981,6 +1298,23 @@ export default function TradeNexusIndia() {
           </div>
 
           <div className="pnl-chart-toolbar">
+            <div className="pnl-range-buttons" role="group" aria-label="P&amp;L chart time range">
+              {Object.keys(PNL_CHART_RANGES).map((range) => (
+                <button
+                  type="button"
+                  key={range}
+                  className={pnlChartRange === range ? 'active' : ''}
+                  aria-pressed={pnlChartRange === range}
+                  aria-label={range === 'ALL' ? 'Show all historical P&L data' : `Show P&L data for ${range}`}
+                  onClick={() => {
+                    setPnlChartRange(range);
+                    setHoveredPnlIndex(null);
+                  }}
+                >
+                  {range}
+                </button>
+              ))}
+            </div>
             <div className="pnl-chart-legend" aria-label="Toggle chart lines">
               <button
                 type="button"
@@ -1004,101 +1338,231 @@ export default function TradeNexusIndia() {
                 <span className="legend-swatch" aria-hidden="true" />
                 Unrealized P&amp;L
               </button>
+              <button
+                type="button"
+                className={`pnl-legend-button points-legend ${showPnlPoints ? 'selected' : ''}`}
+                aria-pressed={showPnlPoints}
+                aria-label={`Turn historical point markers ${showPnlPoints ? 'off' : 'on'}`}
+                onClick={() => setShowPnlPoints((visible) => !visible)}
+              >
+                <span className="legend-point-swatch" aria-hidden="true" />
+                History points {showPnlPoints ? 'On' : 'Off'}
+              </button>
+            </div>
+            <div className="pnl-sign-legend" aria-label="P&amp;L colors">
+              <span><i className="profit-swatch" /> Profit</span>
+              <span><i className="loss-swatch" /> Loss</span>
             </div>
             <div className="pnl-hover-summary" aria-live="polite">
-              <span>{hoveredPnlIndex === null ? 'Current' : 'Point'} values</span>
-              {hoveredPnlIndex !== null && pnlHistory[hoveredPnlIndex] && (
-                <time>{new Date(pnlHistory[hoveredPnlIndex].time).toLocaleTimeString()}</time>
+              <span>{hoveredPnlPoint ? 'Selected point' : 'Latest update'}</span>
+              {hoveredPnlPoint && (
+                <time>
+                  {new Date(hoveredPnlPoint.time).toLocaleString('en-IN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </time>
               )}
-              <strong>Realized ₹{(pnlHistory[hoveredPnlIndex ?? pnlHistory.length - 1]?.realized ?? realizedPnL).toFixed(0)}</strong>
-              <strong>Unrealized ₹{(pnlHistory[hoveredPnlIndex ?? pnlHistory.length - 1]?.unrealized ?? unrealizedPnL).toFixed(0)}</strong>
+              <strong>
+                Realized ₹{(hoveredPnlPoint?.realized ?? chartHistory[chartHistory.length - 1]?.realized ?? realizedPnL).toFixed(0)}
+              </strong>
+              <strong>
+                Unrealized ₹{(hoveredPnlPoint?.unrealized ?? chartHistory[chartHistory.length - 1]?.unrealized ?? unrealizedPnL).toFixed(0)}
+              </strong>
             </div>
           </div>
 
-          <div
-            className="pnl-chart-wrap"
-            onPointerMove={handlePnlPointerMove}
-            onPointerLeave={() => setHoveredPnlIndex(null)}
-          >
+          <div className="pnl-chart-viewport">
             <svg
-              className="pnl-chart-svg"
-              viewBox={`0 0 ${pnlChart.width} ${pnlChart.height}`}
-              preserveAspectRatio="none"
-              role="img"
-              aria-label="Interactive chart comparing realized and unrealized simulated profit and loss over recent updates"
+              className="pnl-chart-axis"
+              viewBox={`0 0 58 ${pnlChart.height}`}
+              aria-hidden="true"
             >
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                const y = pnlChart.paddingY + ratio * pnlPlotHeight;
                 const value = pnlAxisMax - ratio * pnlRange;
+                const y = pnlChart.paddingY + ratio * pnlPlotHeight;
                 return (
-                  <g key={ratio}>
+                  <text
+                    className="pnl-axis-label"
+                    key={ratio}
+                    x="50"
+                    y={y + 4}
+                    textAnchor="end"
+                  >
+                    {formatPnlAxisValue(value)}
+                  </text>
+                );
+              })}
+            </svg>
+            <div
+              className="pnl-chart-wrap"
+              ref={pnlChartScrollRef}
+              onScroll={(event) => {
+                const chart = event.currentTarget;
+                pnlFollowLatestRef.current =
+                  chart.scrollWidth - chart.clientWidth - chart.scrollLeft <= 40;
+              }}
+              onPointerMove={handlePnlPointerMove}
+              onPointerLeave={() => setHoveredPnlIndex(null)}
+            >
+              <svg
+                className="pnl-chart-svg"
+                width={pnlChart.width}
+                style={{ width: `${pnlChart.width}px` }}
+                viewBox={`0 0 ${pnlChart.width} ${pnlChart.height}`}
+                preserveAspectRatio="none"
+                role="img"
+                aria-label={`Interactive ${pnlChartRange} profit and loss chart`}
+              >
+                <defs>
+                  <linearGradient id="pnl-profit-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#15ff91" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#15ff91" stopOpacity="0.015" />
+                  </linearGradient>
+                  <linearGradient id="pnl-loss-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ff365f" stopOpacity="0.015" />
+                    <stop offset="100%" stopColor="#ff365f" stopOpacity="0.27" />
+                  </linearGradient>
+                  <clipPath id="pnl-profit-clip">
+                    <rect
+                      x="0"
+                      y={pnlChart.paddingY}
+                      width={pnlChart.width}
+                      height={pnlZeroY - pnlChart.paddingY}
+                    />
+                  </clipPath>
+                  <clipPath id="pnl-loss-clip">
+                    <rect
+                      x="0"
+                      y={pnlZeroY}
+                      width={pnlChart.width}
+                      height={pnlChart.height - pnlChart.paddingY - pnlZeroY}
+                    />
+                  </clipPath>
+                </defs>
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                  const y = pnlChart.paddingY + ratio * pnlPlotHeight;
+                  const value = pnlAxisMax - ratio * pnlRange;
+                  return (
                     <line
                       className={Math.abs(value) < pnlAxisMax * 0.001 ? 'pnl-zero-gridline' : 'pnl-gridline'}
-                      x1={pnlChart.paddingX}
-                      x2={pnlChart.width - pnlChart.paddingX}
+                      key={ratio}
+                      x1="0"
+                      x2={pnlChart.width}
                       y1={y}
                       y2={y}
                     />
-                    <text className="pnl-axis-label" x={pnlChart.paddingX - 8} y={y + 4} textAnchor="end">
-                      {formatPnlAxisValue(value)}
-                    </text>
-                  </g>
-                );
-              })}
-              {hoveredPnlIndex !== null && (
+                  );
+                })}
                 <line
-                  className="pnl-hover-line"
-                  x1={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  x2={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  y1={pnlChart.paddingY}
-                  y2={pnlChart.height - pnlChart.paddingY}
+                  className="pnl-zero-gridline"
+                  x1="0"
+                  x2={pnlChart.width}
+                  y1={pnlZeroY}
+                  y2={pnlZeroY}
                 />
+                <g clipPath="url(#pnl-profit-clip)">
+                  {showRealized && (
+                    <path className="pnl-area" d={getPnlAreaPath('realized')} fill="url(#pnl-profit-gradient)" />
+                  )}
+                  {showUnrealized && (
+                    <path className="pnl-area pnl-area-secondary" d={getPnlAreaPath('unrealized')} fill="url(#pnl-profit-gradient)" />
+                  )}
+                  {showRealized && <path className="pnl-line pnl-profit-line" d={getPnlPath('realized')} />}
+                  {showUnrealized && <path className="pnl-line pnl-profit-line pnl-secondary-line" d={getPnlPath('unrealized')} />}
+                </g>
+                <g clipPath="url(#pnl-loss-clip)">
+                  {showRealized && (
+                    <path className="pnl-area" d={getPnlAreaPath('realized')} fill="url(#pnl-loss-gradient)" />
+                  )}
+                  {showUnrealized && (
+                    <path className="pnl-area pnl-area-secondary" d={getPnlAreaPath('unrealized')} fill="url(#pnl-loss-gradient)" />
+                  )}
+                  {showRealized && <path className="pnl-line pnl-loss-line" d={getPnlPath('realized')} />}
+                  {showUnrealized && <path className="pnl-line pnl-loss-line pnl-secondary-line" d={getPnlPath('unrealized')} />}
+                </g>
+                {hoveredPnlIndex !== null && (
+                  <line
+                    className="pnl-hover-line"
+                    x1={getPnlX(hoveredPnlIndex)}
+                    x2={getPnlX(hoveredPnlIndex)}
+                    y1={pnlChart.paddingY}
+                    y2={pnlChart.height - pnlChart.paddingY}
+                  />
+                )}
+                {showPnlPoints && showRealized && chartHistory.map((point, index) => (
+                  <circle
+                    className={`pnl-point ${point.realized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    key={`realized-${point.time}-${index}`}
+                    cx={getPnlX(index)}
+                    cy={getPnlY(point.realized)}
+                    r={index === chartHistory.length - 1 ? '4.5' : '3.2'}
+                  >
+                    <title>
+                      Realized P&amp;L · {new Date(point.time).toLocaleString()} · ₹{point.realized.toFixed(2)}
+                    </title>
+                  </circle>
+                ))}
+                {showPnlPoints && showUnrealized && chartHistory.map((point, index) => (
+                  <circle
+                    className={`pnl-point ${point.unrealized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    key={`unrealized-${point.time}-${index}`}
+                    cx={getPnlX(index)}
+                    cy={getPnlY(point.unrealized)}
+                    r={index === chartHistory.length - 1 ? '4.5' : '3.2'}
+                  >
+                    <title>
+                      Unrealized P&amp;L · {new Date(point.time).toLocaleString()} · ₹{point.unrealized.toFixed(2)}
+                    </title>
+                  </circle>
+                ))}
+                {showPnlPoints && hoveredPnlIndex !== null && showRealized && (
+                  <circle
+                    className={`pnl-hover-point ${hoveredPnlPoint.realized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    cx={getPnlX(hoveredPnlIndex)}
+                    cy={getPnlY(hoveredPnlPoint.realized)}
+                    r="8"
+                  />
+                )}
+                {showPnlPoints && hoveredPnlIndex !== null && showUnrealized && (
+                  <circle
+                    className={`pnl-hover-point ${hoveredPnlPoint.unrealized < 0 ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                    cx={getPnlX(hoveredPnlIndex)}
+                    cy={getPnlY(hoveredPnlPoint.unrealized)}
+                    r="8"
+                  />
+                )}
+              </svg>
+              {hoveredPnlPoint && (
+                <div
+                  className="pnl-chart-tooltip"
+                  style={{
+                    left: Math.max(12, Math.min(getPnlX(hoveredPnlIndex) - 86, pnlChart.width - 188)),
+                    top: Math.max(4, Math.min(getPnlY(hoveredPnlPoint.realized) - 62, pnlChart.height - 120)),
+                  }}
+                  aria-live="polite"
+                >
+                  <time>
+                    {new Date(hoveredPnlPoint.time).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
+                  <strong className={hoveredPnlPoint.realized + hoveredPnlPoint.unrealized < 0 ? 'loss-value' : 'profit-value'}>
+                    Total P&amp;L ₹{(hoveredPnlPoint.realized + hoveredPnlPoint.unrealized).toFixed(2)}
+                  </strong>
+                  <span>Realized ₹{hoveredPnlPoint.realized.toFixed(2)}</span>
+                  <span>Unrealized ₹{hoveredPnlPoint.unrealized.toFixed(2)}</span>
+                </div>
               )}
-              {showRealized && (
-                <polyline className="pnl-line realized-line" points={getPnlPoints('realized')} />
-              )}
-              {showUnrealized && (
-                <polyline className="pnl-line unrealized-line" points={getPnlPoints('unrealized')} />
-              )}
-              {showRealized && (
-                <circle
-                  className="pnl-point realized-point"
-                  cx={pnlChart.width - pnlChart.paddingX}
-                  cy={getPnlY(realizedPnL)}
-                  r="5.5"
-                />
-              )}
-              {showUnrealized && (
-                <circle
-                  className="pnl-point unrealized-point"
-                  cx={pnlChart.width - pnlChart.paddingX}
-                  cy={getPnlY(unrealizedPnL)}
-                  r="3.2"
-                />
-              )}
-              {hoveredPnlIndex !== null && showRealized && (
-                <circle
-                  className="pnl-point realized-point"
-                  cx={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  cy={getPnlY(pnlHistory[hoveredPnlIndex].realized)}
-                  r="5"
-                />
-              )}
-              {hoveredPnlIndex !== null && showUnrealized && (
-                <circle
-                  className="pnl-point unrealized-point"
-                  cx={pnlChart.paddingX + (hoveredPnlIndex / Math.max(pnlHistory.length - 1, 1)) * pnlPlotWidth}
-                  cy={getPnlY(pnlHistory[hoveredPnlIndex].unrealized)}
-                  r="5"
-                />
-              )}
-            </svg>
-            <div className="pnl-time-labels">
-              <span>Earlier updates</span>
-              <span>Latest</span>
+              <div className="pnl-time-labels" style={{ width: pnlChart.width }}>
+                {pnlDateTicks.map((tick) => (
+                  <span key={tick.index}>{tick.label}</span>
+                ))}
+              </div>
             </div>
           </div>
-          <p className="pnl-chart-footnote">The chart starts at ₹0 and updates as your trades and positions change. Hover to inspect values; positive values are gains and negative values are losses.</p>
+          <p className="pnl-chart-footnote">Live portfolio P&amp;L across the selected period. Hover over the chart to inspect dated values; gains glow green and losses glow red.</p>
         </section>
 
         <label className="search-panel">
@@ -1565,23 +2029,74 @@ export default function TradeNexusIndia() {
             )}
             {filteredStocks.map((stock) => {
               const qty = quantities[stock.symbol] ?? 1;
-              const history = priceHistory[stock.symbol] || [stock.price];
-              const firstPrice = history[0];
-              const lastPrice = history[history.length - 1];
-              const trendPercent = firstPrice ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+              const history = marketHistory[stock.symbol];
+              const historyPoints = history?.points || [];
+              const firstPrice = historyPoints[0]?.price;
+              const lastPrice = historyPoints[historyPoints.length - 1]?.price;
+              const trendPercent =
+                Number.isFinite(firstPrice) && firstPrice !== 0 && Number.isFinite(lastPrice)
+                  ? ((lastPrice - firstPrice) / firstPrice) * 100
+                  : 0;
               const trendUp = trendPercent >= 0;
-              const chartWidth = 320;
               const chartHeight = 64;
-              const historyMin = Math.min(...history);
-              const historyMax = Math.max(...history);
-              const historyRange = historyMax - historyMin || historyMax * 0.01 || 1;
-              const chartPoints = history.map((price, index) => {
-                const x = (index / Math.max(history.length - 1, 1)) * chartWidth;
-                const y = chartHeight - ((price - historyMin) / historyRange) * (chartHeight - 10) - 5;
+              const chartInset = 8;
+              const chartViewportWidth = marketChartWidths[stock.symbol] || 320;
+              const pointSpacing = Math.max(
+                12,
+                (chartViewportWidth - chartInset * 2) / 5
+              );
+              const chartWidth = Math.max(
+                chartViewportWidth,
+                chartInset * 2 + Math.max(historyPoints.length - 1, 0) * pointSpacing
+              );
+              const getMarketHistoryX = (index) => chartInset + index * pointSpacing;
+              const chartScrollLeft = marketChartScrollLeft[stock.symbol] || 0;
+              const firstVisibleIndex = Math.min(
+                historyPoints.length - 1,
+                Math.max(0, Math.floor((chartScrollLeft - chartInset) / pointSpacing))
+              );
+              const lastVisibleIndex = Math.max(
+                firstVisibleIndex + 1,
+                Math.min(
+                  historyPoints.length,
+                  Math.ceil((chartScrollLeft + chartViewportWidth - chartInset) / pointSpacing) + 1
+                )
+              );
+              const visiblePrices = historyPoints
+                .slice(firstVisibleIndex, lastVisibleIndex)
+                .map((point) => point.price);
+              const visibleMin = Math.min(...visiblePrices);
+              const visibleMax = Math.max(...visiblePrices);
+              const visibleRange =
+                visibleMax - visibleMin || Math.max(Math.abs(visibleMax) * 0.002, 0.01);
+              const chartMin = visibleMin - visibleRange * 0.12;
+              const chartMax = visibleMax + visibleRange * 0.12;
+              const chartValueRange = chartMax - chartMin || 1;
+              const getMarketHistoryY = (price) =>
+                chartHeight - ((price - chartMin) / chartValueRange) * (chartHeight - 10) - 5;
+              const chartPoints = historyPoints.map((point, index) => {
+                const x = getMarketHistoryX(index);
+                const y = getMarketHistoryY(point.price);
                 return `${x},${y}`;
               });
               const chartLine = chartPoints.join(' ');
-              const chartArea = `0,${chartHeight} ${chartLine} ${chartWidth},${chartHeight}`;
+              const baselineY = Math.max(
+                5,
+                Math.min(chartHeight - 5, getMarketHistoryY(firstPrice ?? visibleMin))
+              );
+              const lastChartX = getMarketHistoryX(Math.max(historyPoints.length - 1, 0));
+              const chartArea = `M ${chartInset},${baselineY} L ${chartLine} L ${lastChartX},${baselineY} Z`;
+              const showPoints = showMarketPoints[stock.symbol] ?? true;
+              const hoveredHistoryIndex = hoveredMarketHistory[stock.symbol] ?? null;
+              const hoveredHistoryPoint =
+                hoveredHistoryIndex === null ? null : historyPoints[hoveredHistoryIndex];
+              const profitClipId = `market-history-profit-${stock.symbol}`;
+              const lossClipId = `market-history-loss-${stock.symbol}`;
+              const profitGradientId = `market-history-profit-gradient-${stock.symbol}`;
+              const lossGradientId = `market-history-loss-gradient-${stock.symbol}`;
+              const marketDateTicks = getDateTicks(
+                historyPoints.map((point) => point.time * 1000)
+              );
 
               return (
                 <article key={stock.symbol} className="stock-card">
@@ -1596,26 +2111,227 @@ export default function TradeNexusIndia() {
 
                   <div className={`price-chart ${trendUp ? 'trend-up' : 'trend-down'}`}>
                     <div className="chart-caption">
-                      <span>Recent simulated trend</span>
-                      <strong>
-                        <span aria-hidden="true">{trendUp ? '↗' : '↘'}</span>
-                        {trendUp ? '+' : ''}{trendPercent.toFixed(2)}%
-                      </strong>
+                      <span>
+                        1-month market trend
+                        {history?.source === 'simulated'
+                          ? ' · simulated'
+                          : history?.source === 'live-demo'
+                            ? ' · live demo'
+                            : ''}
+                      </span>
+                      <div className="trend-chart-controls">
+                        {history?.status === 'ready' && (
+                          <strong>
+                            <span aria-hidden="true">{trendUp ? '↗' : '↘'}</span>
+                            {trendUp ? '+' : ''}{trendPercent.toFixed(2)}%
+                          </strong>
+                        )}
+                        <button
+                          type="button"
+                          className={`pnl-legend-button points-legend trend-points-toggle ${showPoints ? 'selected' : ''}`}
+                          aria-pressed={showPoints}
+                          aria-label={`${stock.symbol} historical points ${showPoints ? 'on' : 'off'}`}
+                          onClick={() =>
+                            setShowMarketPoints((previous) => ({
+                              ...previous,
+                              [stock.symbol]: !showPoints,
+                            }))
+                          }
+                        >
+                          <span className="legend-point-swatch" aria-hidden="true" />
+                          Points {showPoints ? 'On' : 'Off'}
+                        </button>
+                      </div>
                     </div>
-                    <svg
-                      className="trend-chart"
-                      viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                      preserveAspectRatio="none"
-                      role="img"
-                      aria-label={`${stock.symbol} simulated price chart, ${trendUp ? 'up' : 'down'} ${Math.abs(trendPercent).toFixed(2)} percent`}
-                    >
-                      <polygon className="chart-area" points={chartArea} />
-                      <polyline className="chart-line" points={chartLine} />
-                    </svg>
-                    <div className="chart-axis">
-                      <span>Earlier</span>
-                      <span>Now</span>
-                    </div>
+                    {history?.status === 'loading' && (
+                      <p className="market-history-message" role="status">Loading market history…</p>
+                    )}
+                    {history?.status === 'error' && (
+                      <p className="market-history-message lookup-error" role="alert">
+                        Market history is unavailable. Try again later.
+                      </p>
+                    )}
+                    {history?.status === 'ready' && (
+                      <>
+                        <div
+                          className="trend-chart-frame"
+                          data-market-symbol={stock.symbol}
+                          ref={(element) => {
+                            marketHistoryChartRefs.current[stock.symbol] = element;
+                          }}
+                          onScroll={(event) => {
+                            const chart = event.currentTarget;
+                            const scrollLeft = Math.round(chart.scrollLeft);
+                            setMarketChartScrollLeft((previous) =>
+                              previous[stock.symbol] === scrollLeft
+                                ? previous
+                                : { ...previous, [stock.symbol]: scrollLeft }
+                            );
+                            marketHistoryFollowLatest.current[stock.symbol] =
+                              chart.scrollWidth - chart.clientWidth - chart.scrollLeft <= 24;
+                          }}
+                          onPointerMove={(event) => {
+                            const bounds = event.currentTarget.getBoundingClientRect();
+                            const pointerX = event.clientX - bounds.left + event.currentTarget.scrollLeft;
+                            const index = Math.round(
+                              (pointerX - chartInset) / pointSpacing
+                            );
+                            const nextIndex = Math.max(
+                              0,
+                              Math.min(historyPoints.length - 1, index)
+                            );
+                            setHoveredMarketHistory((previous) => ({
+                              ...previous,
+                              [stock.symbol]: nextIndex,
+                            }));
+                          }}
+                          onPointerLeave={() => {
+                            setHoveredMarketHistory((previous) => {
+                              const next = { ...previous };
+                              delete next[stock.symbol];
+                              return next;
+                            });
+                          }}
+                        >
+                          <div className="trend-chart-content" style={{ width: chartWidth }}>
+                          <svg
+                            className="trend-chart"
+                            width={chartWidth}
+                            style={{ width: `${chartWidth}px` }}
+                            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                            preserveAspectRatio="none"
+                            role="img"
+                            aria-label={`${stock.symbol} one-month market price history, ${trendUp ? 'up' : 'down'} ${Math.abs(trendPercent).toFixed(2)} percent`}
+                          >
+                            <defs>
+                              <linearGradient id={profitGradientId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#15ff91" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#15ff91" stopOpacity="0.015" />
+                              </linearGradient>
+                              <linearGradient id={lossGradientId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#ff365f" stopOpacity="0.015" />
+                                <stop offset="100%" stopColor="#ff365f" stopOpacity="0.27" />
+                              </linearGradient>
+                              <clipPath id={profitClipId}>
+                                <rect x="0" y="0" width={chartWidth} height={baselineY} />
+                              </clipPath>
+                              <clipPath id={lossClipId}>
+                                <rect
+                                  x="0"
+                                  y={baselineY}
+                                  width={chartWidth}
+                                  height={chartHeight - baselineY}
+                                />
+                              </clipPath>
+                            </defs>
+                            {[0.25, 0.5, 0.75].map((ratio) => {
+                              const y = ratio * chartHeight;
+                              return (
+                                <line
+                                  className="pnl-gridline"
+                                  key={ratio}
+                                  x1="0"
+                                  x2={chartWidth}
+                                  y1={y}
+                                  y2={y}
+                                />
+                              );
+                            })}
+                            <line
+                              className="pnl-zero-gridline"
+                              x1="0"
+                              x2={chartWidth}
+                              y1={baselineY}
+                              y2={baselineY}
+                            />
+                            <g clipPath={`url(#${profitClipId})`}>
+                              <path className="pnl-area" d={chartArea} fill={`url(#${profitGradientId})`} />
+                              <polyline className="pnl-line pnl-profit-line" points={chartLine} />
+                            </g>
+                            <g clipPath={`url(#${lossClipId})`}>
+                              <path className="pnl-area" d={chartArea} fill={`url(#${lossGradientId})`} />
+                              <polyline className="pnl-line pnl-loss-line" points={chartLine} />
+                            </g>
+                            {showPoints && historyPoints.map((point, index) => (
+                              <circle
+                                className={`pnl-point ${point.price < firstPrice ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                                key={`${point.time}-${index}`}
+                                cx={getMarketHistoryX(index)}
+                                cy={getMarketHistoryY(point.price)}
+                                r={index === historyPoints.length - 1 ? '4.5' : '3.2'}
+                              >
+                                <title>
+                                  {new Date(point.time * 1000).toLocaleString('en-IN')} · ₹{point.price.toFixed(2)}
+                                </title>
+                              </circle>
+                            ))}
+                            {hoveredHistoryPoint && (
+                              <>
+                                <line
+                                  className="pnl-hover-line"
+                                  x1={getMarketHistoryX(hoveredHistoryIndex)}
+                                  x2={getMarketHistoryX(hoveredHistoryIndex)}
+                                  y1="0"
+                                  y2={chartHeight}
+                                />
+                                {showPoints && (
+                                  <circle
+                                    className={`pnl-hover-point ${hoveredHistoryPoint.price < firstPrice ? 'pnl-loss-point' : 'pnl-profit-point'}`}
+                                    cx={getMarketHistoryX(hoveredHistoryIndex)}
+                                    cy={getMarketHistoryY(hoveredHistoryPoint.price)}
+                                    r="6"
+                                  />
+                                )}
+                              </>
+                            )}
+                          </svg>
+                          {hoveredHistoryPoint && (
+                            <div
+                              className="pnl-chart-tooltip market-history-tooltip"
+                              style={{
+                                left: Math.max(
+                                  8,
+                                  Math.min(getMarketHistoryX(hoveredHistoryIndex) - 80, chartWidth - 168)
+                                ),
+                              }}
+                              aria-live="polite"
+                            >
+                              <time>
+                                {new Date(hoveredHistoryPoint.time * 1000).toLocaleString('en-IN', {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                              </time>
+                              <strong className={hoveredHistoryPoint.price < firstPrice ? 'loss-value' : 'profit-value'}>
+                                ₹{hoveredHistoryPoint.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              </strong>
+                              <span>
+                                {((hoveredHistoryPoint.price - firstPrice) / firstPrice * 100).toFixed(2)}% vs period open
+                              </span>
+                            </div>
+                          )}
+                            <div className="trend-chart-axis" style={{ width: chartWidth }}>
+                            {marketDateTicks.map((tick) => (
+                              <span
+                                key={tick.index}
+                                className={tick.index === 0 ? 'first-tick' : tick.index === historyPoints.length - 1 ? 'last-tick' : ''}
+                                style={{ left: getMarketHistoryX(tick.index) }}
+                              >
+                                {tick.label}
+                              </span>
+                            ))}
+                            </div>
+                          </div>
+                        </div>
+                        {history?.error && (
+                          <p className="market-history-refresh-error" role="status">
+                            {history.source === 'simulated'
+                              ? 'Market feed unavailable; showing a simulated trend.'
+                              : 'Market refresh unavailable; showing previously loaded data.'}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   <div className="quantity-area">
@@ -1739,6 +2455,49 @@ export default function TradeNexusIndia() {
           <span>Developed by</span>
           <strong>Himanshu kumar</strong>
         </footer>
+
+        {apkModalOpen && (
+          <div
+            className="order-dialog-backdrop apk-modal-backdrop"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setApkModalOpen(false);
+            }}
+          >
+            <section
+              className="apk-download-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="apk-modal-title"
+              aria-describedby="apk-modal-description"
+            >
+              <button
+                className="apk-modal-close"
+                type="button"
+                aria-label="Close download dialog"
+                onClick={() => setApkModalOpen(false)}
+              >
+                ×
+              </button>
+              <span className="apk-modal-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 16v3h14v-3" />
+                </svg>
+              </span>
+              <p className="apk-modal-eyebrow">TRADE NEXUS • ANDROID</p>
+              <h2 id="apk-modal-title">Take your trading dashboard with you</h2>
+              <p id="apk-modal-description">
+                Download the Android app to keep TradeNexus close wherever you go.
+              </p>
+              <a
+                className="apk-download-button"
+                href="/TradeNexus-India.apk"
+                download="TradeNexus-India.apk"
+              >
+                Download Android app
+              </a>
+            </section>
+          </div>
+        )}
 
         {depositOpen && (
           <div className="order-dialog-backdrop">
