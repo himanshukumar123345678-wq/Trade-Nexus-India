@@ -1,148 +1,129 @@
-import mysql from 'mysql2/promise';
+import {
+  AuthenticationError,
+  requireAuthenticatedUser,
+} from './auth.mjs';
+import {
+  databaseErrorResponse,
+  getDatabasePool,
+  jsonResponse,
+} from './database.mjs';
+import { calculateHoldings, validatePaperOrder } from './portfolio.mjs';
+import { getTwelveDataQuote, MarketDataError } from './twelvedata.mjs';
 
-let pool;
-
-class MissingDatabaseConfigurationError extends Error {}
-
-function jsonResponse(statusCode, body) {
-  return new Response(JSON.stringify(body), {
-    status: statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
-
-function handleDatabaseInitializationError(error) {
-  if (error instanceof MissingDatabaseConfigurationError) {
-    console.error(error.message);
-    return jsonResponse(503, { error: 'Trade storage is not configured.' });
+async function getAccount(request) {
+  try {
+    return { account: await requireAuthenticatedUser(request) };
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return { response: jsonResponse(401, { error: error.message, code: 'AUTH_REQUIRED' }) };
+    }
+    return { response: databaseErrorResponse(error) };
   }
-
-  console.error('Failed to initialize trade storage:', error);
-  return jsonResponse(500, { error: 'Could not initialize trade storage.' });
-}
-
-function getDatabasePool() {
-  const MYSQL_HOST = process.env.MYSQL_HOST || process.env.mysql_host;
-  const MYSQL_USER = process.env.MYSQL_USER || process.env.mysql_user;
-  const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || process.env.mysql_password;
-  const MYSQL_DATABASE = process.env.MYSQL_DATABASE || process.env.mysql_database;
-  const MYSQL_PORT = process.env.MYSQL_PORT || process.env.mysql_port;
-  if (!MYSQL_HOST || !MYSQL_USER || !MYSQL_PASSWORD || !MYSQL_DATABASE) {
-    const missingVariables = [
-      ['MYSQL_HOST', MYSQL_HOST],
-      ['MYSQL_USER', MYSQL_USER],
-      ['MYSQL_PASSWORD', MYSQL_PASSWORD],
-      ['MYSQL_DATABASE', MYSQL_DATABASE],
-    ]
-      .filter(([, value]) => !value)
-      .map(([name]) => name);
-    throw new MissingDatabaseConfigurationError(
-      `MySQL connection environment variables are not configured: ${missingVariables.join(', ')}.`
-    );
-  }
-
-  if (!pool) {
-    pool = mysql.createPool({
-      host: MYSQL_HOST,
-      port: Number(MYSQL_PORT || 3306),
-      user: MYSQL_USER,
-      password: MYSQL_PASSWORD,
-      database: MYSQL_DATABASE,
-      waitForConnections: true,
-      connectionLimit: 5,
-    });
-  }
-
-  return pool;
 }
 
 export default async function handleTradesRequest(request) {
-  const url = new URL(request.url);
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    return jsonResponse(405, { error: 'Only GET and POST requests are supported.' });
+  if (!['GET', 'POST'].includes(request.method)) {
+    return jsonResponse(405, { error: 'Only GET and POST requests are supported.' }, { allow: 'GET, POST' });
   }
 
+  const { account, response } = await getAccount(request);
+  if (response) return response;
+
+  const pool = getDatabasePool();
   if (request.method === 'GET') {
-    const userId = url.searchParams.get('userId')?.trim();
-    if (!userId || userId.length > 255) {
-      return jsonResponse(400, { error: 'A valid userId is required.' });
-    }
-
-    let db;
     try {
-      db = getDatabasePool();
-    } catch (error) {
-      return handleDatabaseInitializationError(error);
-    }
-
-    try {
-      const [trades] = await db.execute(
-        'SELECT id, user_id, stock_name, transaction_type, quantity, price, trade_date FROM trades WHERE user_id = ? ORDER BY trade_date DESC',
-        [userId]
+      const [accounts] = await pool.execute(
+        'SELECT balance FROM tn_virtual_accounts WHERE user_id = ? LIMIT 1',
+        [account.id]
       );
-      return jsonResponse(200, trades);
+      if (!accounts.length) return jsonResponse(404, { error: 'Virtual account was not found.' });
+      const [trades] = await pool.execute(
+        `SELECT id, stock_name, transaction_type, quantity, price, trade_date
+         FROM trades WHERE user_id = ? ORDER BY trade_date ASC, id ASC`,
+        [account.id]
+      );
+      return jsonResponse(200, { cash: Number(accounts[0].balance), trades });
     } catch (error) {
-      console.error('Failed to fetch trades:', error);
-      return jsonResponse(500, { error: 'Could not fetch trades.' });
+      return databaseErrorResponse(error);
     }
   }
 
-  let trade;
+  let body;
   try {
-    trade = await request.json();
+    body = await request.json();
   } catch {
     return jsonResponse(400, { error: 'Request body must be valid JSON.' });
   }
-
-  if (!trade || typeof trade !== 'object' || Array.isArray(trade)) {
-    return jsonResponse(400, { error: 'Trade details are invalid.' });
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonResponse(400, { error: 'Order details are invalid.' });
   }
 
-  const userId = typeof trade.userId === 'string' ? trade.userId.trim() : '';
-  const stockName = typeof trade.stockName === 'string' ? trade.stockName.trim() : '';
-  const type = typeof trade.type === 'string' ? trade.type.trim().toUpperCase() : '';
-  const quantity = Number(trade.quantity);
-  const price = Number(trade.price);
-
-  if (
-    !userId ||
-    userId.length > 255 ||
-    !stockName ||
-    stockName.length > 100 ||
-    !['BUY', 'SELL'].includes(type) ||
-    !Number.isSafeInteger(quantity) ||
-    quantity <= 0 ||
-    quantity > 2147483647 ||
-    !Number.isFinite(price) ||
-    price <= 0 ||
-    price > 99999999.99
-  ) {
-    return jsonResponse(400, { error: 'Trade details are invalid.' });
-  }
-
-  let db;
+  let quote;
   try {
-    db = getDatabasePool();
+    quote = await getTwelveDataQuote(body.stockName);
   } catch (error) {
-    return handleDatabaseInitializationError(error);
+    if (error instanceof MarketDataError) {
+      return jsonResponse(error.status, { error: error.message, code: error.code });
+    }
+    console.error('Could not validate current market price:', error);
+    return jsonResponse(502, { error: 'Could not verify the current market price.' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await db.execute(
-      'INSERT INTO trades (user_id, stock_name, transaction_type, quantity, price) VALUES (?, ?, ?, ?, ?)',
-      [userId, stockName, type, quantity, price]
+    await connection.beginTransaction();
+    const [accounts] = await connection.execute(
+      'SELECT balance FROM tn_virtual_accounts WHERE user_id = ? FOR UPDATE',
+      [account.id]
     );
+    if (!accounts.length) {
+      await connection.rollback();
+      return jsonResponse(404, { error: 'Virtual account was not found.' });
+    }
+    const [trades] = await connection.execute(
+      `SELECT stock_name, transaction_type, quantity, price
+       FROM trades WHERE user_id = ? ORDER BY trade_date ASC, id ASC`,
+      [account.id]
+    );
+    const cash = Number(accounts[0].balance);
+    let order;
+    try {
+      order = validatePaperOrder({
+        stockName: quote.symbol,
+        type: body.type,
+        quantity: body.quantity,
+        price: quote.price,
+      }, cash, calculateHoldings(trades).holdings);
+    } catch (error) {
+      await connection.rollback();
+      return jsonResponse(400, { error: error.message });
+    }
+
+    const nextCash = Number((cash + (order.side === 'SELL' ? order.total : -order.total)).toFixed(2));
+    const [result] = await connection.execute(
+      'INSERT INTO trades (user_id, stock_name, transaction_type, quantity, price) VALUES (?, ?, ?, ?, ?)',
+      [account.id, order.symbol, order.side, order.quantity, order.price]
+    );
+    await connection.execute(
+      'UPDATE tn_virtual_accounts SET balance = ? WHERE user_id = ?',
+      [nextCash, account.id]
+    );
+    await connection.commit();
     return jsonResponse(201, {
       id: Number(result.insertId),
-      user_id: userId,
-      stock_name: stockName,
-      transaction_type: type,
-      quantity,
-      price,
+      stock_name: order.symbol,
+      transaction_type: order.side,
+      quantity: order.quantity,
+      price: order.price,
       trade_date: new Date().toISOString(),
+      cash: nextCash,
+      source: quote.source,
+      quoteTimestamp: quote.timestamp,
     });
   } catch (error) {
-    console.error('Failed to save trade:', error);
-    return jsonResponse(500, { error: 'Could not save trade.' });
+    await connection.rollback();
+    return databaseErrorResponse(error);
+  } finally {
+    connection.release();
   }
 }

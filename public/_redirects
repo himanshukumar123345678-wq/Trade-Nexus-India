@@ -1,0 +1,8 @@
+/api/market/*  /.netlify/functions/market-data/:splat  200
+/api/auth       /.netlify/functions/auth        200
+/api/watchlist  /.netlify/functions/watchlist   200
+/api/deposits   /.netlify/functions/deposits    200
+/api/trade      /.netlify/functions/trades      200
+/api/trades     /.netlify/functions/trades      200
+/api/yahoo/*    /.netlify/functions/yahoo-proxy/:splat 200
+/*              /index.html                     200

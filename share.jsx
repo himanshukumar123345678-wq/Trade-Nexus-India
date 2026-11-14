@@ -573,4 +573,3 @@ export default function TradeNexusIndia() {
       </div>
     </div>
   );
-}

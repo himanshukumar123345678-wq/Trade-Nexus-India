@@ -1,0 +1,16 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/home", "destination": "/" },
+    { "source": "/markets", "destination": "/" },
+    { "source": "/watchlist", "destination": "/" },
+    { "source": "/news", "destination": "/" },
+    { "source": "/paper-trading", "destination": "/" },
+    { "source": "/portfolio", "destination": "/" },
+    { "source": "/profile", "destination": "/" },
+    { "source": "/stock/(.*)", "destination": "/" },
+    { "source": "/stocks/(.*)", "destination": "/" },
+    { "source": "/trade/(.*)", "destination": "/" }
+  ]
+}
